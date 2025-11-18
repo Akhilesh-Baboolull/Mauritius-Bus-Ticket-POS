@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".Menu">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="0dp"
+        android:paddingTop="0dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/clock_view"
+            android:layout_width="200dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="0dp"
+            android:gravity="center_vertical"
+            android:paddingLeft="10dp"
+            android:textColor="@color/black"
+            android:textSize="18sp" />
+
+        <Space
+            android:layout_width="70dp"
+            android:layout_height="30dp" />
+
+        <TextView
+            android:id="@+id/battery_state"
+            android:layout_width="120dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="0dp"
+            android:gravity="right|center_vertical"
+            android:textColor="@color/black"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/battery_icon"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="0dp"
+            android:gravity="center_horizontal|center_vertical"
+            android:text="🔋"
+            android:textColor="@color/black"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/battery_percentage"
+            android:layout_width="50dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="0dp"
+            android:gravity="left|center_vertical"
+            android:textColor="#000000"
+            android:textSize="18sp" />
+
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/aybway_logo"
+        android:layout_width="253dp"
+        android:layout_height="165dp"
+        android:layout_marginStart="109dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="109dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@mipmap/ayb_way_logo_foreground" />
+
+    <TextView
+        android:id="@+id/tenant_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:layout_marginBottom="30dp"
+        android:gravity="center_horizontal"
+        android:text="AYB WAY"
+        android:textSize="34sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/btn_start_day"
+        app:layout_constraintTop_toBottomOf="@+id/aybway_logo"
+        app:layout_constraintVertical_bias="0.0"
+        tools:layout_editor_absoluteX="0dp" />
+
+    <Button
+        android:id="@+id/btn_start_day"
+        android:layout_width="310dp"
+        android:layout_height="80dp"
+        android:layout_marginStart="88dp"
+        android:layout_marginTop="70dp"
+        android:layout_marginEnd="88dp"
+        android:backgroundTint="#031FB8"
+        android:fontFamily="sans-serif"
+        android:text="DAY"
+        android:textAlignment="textStart"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:cornerRadius="0dp"
+        app:icon="@mipmap/day_icon_foreground"
+        app:iconPadding="0dp"
+        app:iconSize="100dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/aybway_logo" />
+
+    <TextView
+        android:id="@+id/current_day_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="80dp"
+        android:gravity="center_horizontal"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/btn_start_day" />
+
+    <Button
+        android:id="@+id/btn_start_trip"
+        android:layout_width="310dp"
+        android:layout_height="80dp"
+        android:layout_marginStart="88dp"
+        android:layout_marginTop="40dp"
+        android:layout_marginEnd="88dp"
+        android:backgroundTint="#B116CC"
+        android:fontFamily="sans-serif"
+        android:text="TRIP"
+        android:textAlignment="textStart"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:cornerRadius="0dp"
+        app:icon="@mipmap/trip_icon_foreground"
+        app:iconPadding="0dp"
+        app:iconSize="100dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/current_day_view" />
+
+    <TextView
+        android:id="@+id/current_trip_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btn_start_trip" />
+
+    <Button
+        android:id="@+id/btn_ticket"
+        android:layout_width="310dp"
+        android:layout_height="80dp"
+        android:layout_marginStart="88dp"
+        android:layout_marginTop="40dp"
+        android:layout_marginEnd="88dp"
+        android:backgroundTint="#FF9800"
+        android:fontFamily="sans-serif"
+        android:text="TICKETING"
+        android:textAlignment="textStart"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:cornerRadius="0dp"
+        app:icon="@mipmap/ticket_icon_foreground"
+        app:iconPadding="0dp"
+        app:iconSize="100dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/current_trip_view" />
+
+    <Button
+        android:id="@+id/btn_report"
+        android:layout_width="310dp"
+        android:layout_height="80dp"
+        android:layout_marginStart="88dp"
+        android:layout_marginTop="50dp"
+        android:layout_marginEnd="88dp"
+        android:backgroundTint="#2B9B06"
+        android:fontFamily="sans-serif"
+        android:text="REPORT"
+        android:textAlignment="textStart"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:cornerRadius="0dp"
+        app:icon="@mipmap/report_icon_foreground"
+        app:iconPadding="0dp"
+        app:iconSize="100dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btn_ticket" />
+
+    <LinearLayout
+        android:id="@+id/linearLayout"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="24dp"
+        android:gravity="center_horizontal"
+        android:orientation="horizontal"
+        android:padding="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="1.0"
+        tools:layout_editor_absoluteX="0dp">
+
+        <TextView
+            android:id="@+id/kioskMode"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:text="Powered By"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/imageView3"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            app:srcCompat="@mipmap/ayb_creations_logo_foreground" />
+
+        <TextView
+            android:id="@+id/debug_secret"
+            android:layout_width="219dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center_vertical|end"
+            android:padding="8dp"
+            android:text="@string/versioning"
+            android:textColor="#CCCCCC"
+            android:visibility="visible" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#C2FFFFFF"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="@android:style/Widget.DeviceDefault.Light.ProgressBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/admin_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#94948E"
+        android:orientation="vertical"
+        android:paddingLeft="50dp"
+        android:paddingTop="30dp"
+        android:paddingRight="50dp"
+        android:paddingBottom="30dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <EditText
+            android:id="@+id/admin_password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:hint="Admin Password"
+            android:inputType="text"
+            android:minHeight="50dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#FFFFFF" />
+
+        <EditText
+            android:id="@+id/userId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:hint="Tenant ID"
+            android:inputType="text"
+            android:minHeight="50dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#FFFFFF" />
+
+        <EditText
+            android:id="@+id/machineId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:hint="Machine ID"
+            android:inputType="text"
+            android:minHeight="50dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#FFFFFF" />
+
+        <EditText
+            android:id="@+id/tenantName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:hint="Tenant Name"
+            android:inputType="text"
+            android:minHeight="50dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btn_update"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="#031FB8"
+            android:text="UPDATE"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_admin_close"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:backgroundTint="#F44336"
+            android:text="Close" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/admin_mode_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#94948E"
+        android:orientation="vertical"
+        android:paddingLeft="50dp"
+        android:paddingTop="30dp"
+        android:paddingRight="50dp"
+        android:paddingBottom="30dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <EditText
+            android:id="@+id/admin_mode_password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:hint="Admin Password"
+            android:inputType="text"
+            android:minHeight="50dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btn_admin_mode_exit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="#031FB8"
+            android:text="EXIT"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_admin_mode_close"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:backgroundTint="#F44336"
+            android:text="Close" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

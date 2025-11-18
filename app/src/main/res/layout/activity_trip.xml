@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".Day">
+
+    <!-- Top Logo -->
+    <ImageView
+        android:id="@+id/image_logo_top"
+        android:layout_width="200dp"
+        android:layout_height="120dp"
+        android:layout_marginTop="32dp"
+        android:src="@mipmap/ayb_way_logo_foreground"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/layout_route"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="100dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/image_logo_top">
+
+        <TextView
+            android:id="@+id/text_choose_route"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="30dp"
+            android:text="Choose Route"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/route_selector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/button_left"
+                android:layout_width="74dp"
+                android:layout_height="74dp"
+                android:backgroundTint="#03A9F4"
+                android:paddingLeft="0dp"
+                android:paddingTop="0dp"
+                android:paddingRight="0dp"
+                android:paddingBottom="0dp"
+                android:text="@string/left"
+                android:textSize="34sp"
+                app:cornerRadius="0dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/view_route"
+                android:layout_width="250dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:background="@drawable/textview_border"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:singleLine="true"
+                android:text="Route 29/240"
+                android:textSize="38sp"
+                app:layout_constraintEnd_toStartOf="@id/button_right"
+                app:layout_constraintStart_toEndOf="@id/button_left"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <Button
+                android:id="@+id/button_right"
+                android:layout_width="74dp"
+                android:layout_height="74dp"
+                android:backgroundTint="#03A9F4"
+                android:paddingLeft="0dp"
+                android:paddingTop="0dp"
+                android:paddingRight="0dp"
+                android:paddingBottom="0dp"
+                android:text="@string/right"
+                android:textSize="34sp"
+                app:cornerRadius="0dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/button_submit"
+                android:layout_width="300dp"
+                android:layout_height="100dp"
+                android:backgroundTint="#4CAF50"
+                android:text="OK"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                app:cornerRadius="0dp" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="30dp" />
+
+            <Button
+                android:id="@+id/button_back"
+                android:layout_width="300dp"
+                android:layout_height="100dp"
+                android:layout_weight="1"
+                android:backgroundTint="#FF0000"
+                android:text="BACK"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                app:cornerRadius="0dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layout_direction"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/image_logo_top">
+
+        <TextView
+            android:id="@+id/text_choose_direction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="30dp"
+            android:text="Choose Direction"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/direction_selector"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="30dp"
+            android:orientation="vertical"
+            android:paddingLeft="30dp"
+            android:paddingRight="30dp">
+
+            <Button
+                android:id="@+id/direction1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="#3F51B5"
+                android:textSize="34sp"
+                app:cornerRadius="0dp" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="60dp" />
+
+            <Button
+                android:id="@+id/direction2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="#3F51B5"
+                android:textSize="34sp"
+                app:cornerRadius="0dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="30dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/button_submit_direction"
+                android:layout_width="300dp"
+                android:layout_height="100dp"
+                android:backgroundTint="#4CAF50"
+                android:text="OK"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                app:cornerRadius="0dp" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="30dp" />
+
+            <Button
+                android:id="@+id/button_back3"
+                android:layout_width="300dp"
+                android:layout_height="100dp"
+                android:layout_weight="1"
+                android:backgroundTint="#FF0000"
+                android:text="BACK"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                app:cornerRadius="0dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layout_end_trip"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="50dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:visibility="visible"
+        app:layout_constraintTop_toBottomOf="@+id/image_logo_top"
+        tools:layout_editor_absoluteX="0dp">
+
+        <TextView
+            android:id="@+id/textView14"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Do you want to end this Trip?"
+            android:textAlignment="center"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="70dp" />
+
+        <Button
+            android:id="@+id/button_end_trip"
+            android:layout_width="250dp"
+            android:layout_height="91dp"
+            android:backgroundTint="#FF9800"
+            android:text="STOP TRIP"
+            android:textSize="34sp"
+            app:cornerRadius="0dp" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="70dp" />
+
+        <Button
+            android:id="@+id/button_back2"
+            android:layout_width="250dp"
+            android:layout_height="91dp"
+            android:backgroundTint="#F80101"
+            android:text="BACK"
+            android:textSize="34sp"
+            app:cornerRadius="0dp" />
+    </LinearLayout>
+
+    <!-- Title -->
+
+    <!-- Route Selector Row -->
+
+    <!-- Bottom Logo (if needed) -->
+
+</androidx.constraintlayout.widget.ConstraintLayout>

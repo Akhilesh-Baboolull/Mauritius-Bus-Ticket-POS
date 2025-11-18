@@ -1,0 +1,71 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+android {
+    namespace 'com.ayb.busticketpos'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.ayb.busticketpos"
+        minSdk 32
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildFeatures {
+        compose true
+        viewBinding true
+    }
+}
+
+dependencies {
+
+    implementation libs.appcompat
+    implementation libs.material
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation libs.lifecycle.runtime.ktx
+    implementation libs.activity.compose
+    implementation platform(libs.compose.bom)
+    implementation libs.ui
+    implementation libs.ui.graphics
+    implementation libs.ui.tooling.preview
+    implementation libs.material3
+    implementation libs.constraintlayout
+    implementation libs.navigation.fragment
+    implementation libs.navigation.ui
+    implementation libs.activity
+    implementation libs.impress
+    implementation libs.room.common.jvm
+    implementation libs.work.runtime
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
+    androidTestImplementation platform(libs.compose.bom)
+    androidTestImplementation libs.ui.test.junit4
+    debugImplementation libs.ui.tooling
+    debugImplementation libs.ui.test.manifest
+    // Room
+    implementation libs.room.runtime
+    annotationProcessor libs.androidx.room.compiler
+    // GSON for JSON parsing
+    implementation libs.gson
+    implementation libs.androidx.security.crypto
+    implementation libs.play.services.location
+}

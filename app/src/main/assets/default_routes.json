@@ -1,0 +1,59 @@
+[
+  { 
+"routeId": "29_240",     
+"routeName": "29/240",     
+"stages": 
+[
+  { "stageNo":  0, "stageName": "G BAY" },
+  { "stageNo":  1, "stageName": "SOTTISE" },
+  { "stageNo":  2, "stageName": "L.VALE.GOV" },
+  { "stageNo":  3, "stageName": "L.VALE.VIL" },
+  { "stageNo":  4, "stageName": "F.DU SAC" },
+  { "stageNo":  5, "stageName": "B.V PILOT" },
+  { "stageNo":  6, "stageName": "P.D.PAPAYE" },
+  { "stageNo":  7, "stageName": "B.MANGUES" },
+  { "stageNo":  8, "stageName": "B.V.HAREL" },
+  { "stageNo":  9, "stageName": "MAPOU" },
+  { "stageNo": 10, "stageName": "M.CHOIX" },
+  { "stageNo": 11, "stageName": "PITON" },
+  { "stageNo": 12, "stageName": "A6 ROAD" },
+  { "stageNo": 13, "stageName": "GOKOOLA" },
+  { "stageNo": 14, "stageName": "L'AMITIE" },
+  { "stageNo": 15, "stageName": "M.LOISIR" },
+  { "stageNo": 16, "stageName": "R.D.REMPART" },
+  { "stageNo": 17, "stageName": "JUNC AMAURY" },
+  { "stageNo": 18, "stageName": "LAVENTURE" },
+  { "stageNo": 19, "stageName": "P.RETRAITE" },
+  { "stageNo": 20, "stageName": "P.BLANC" },
+  { "stageNo": 21, "stageName": "CONSTANCE" },
+  { "stageNo": 22, "stageName": "C.FLACQ" }
+]
+},
+{ "routeId": "21",         "routeName": "21",         
+"stages": [
+{ "stageNo":  0, "stageName": "GOODLANDS" },
+{ "stageNo":  1, "stageName": "P.RAFFRAY" },
+{ "stageNo":  2, "stageName": "L.VALE" },
+{ "stageNo":  3, "stageName": "U.VALE" },
+{ "stageNo":  4, "stageName": "F.D.SAC" },
+{ "stageNo":  5, "stageName": "P.D.PAPAYES" },
+{ "stageNo":  6, "stageName": "M.ST.ANDRE" },
+{ "stageNo":  7, "stageName": "ARSENAL" },
+{ "stageNo":  8, "stageName": "SSRN" },
+{ "stageNo":  9, "stageName": "CALEBASES" },
+{ "stageNo":  10, "stageName": "TERRE ROUGE" },
+{ "stageNo":  11, "stageName": "P.VERTE" },
+{ "stageNo":  12, "stageName": "P.LOUIS" }
+]},
+  { "routeId": "22_express", "routeName": "22 Express", "stages": [
+{ "stageNo":  0, "stageName": "GOODLANDS" },
+{ "stageNo":  1, "stageName": "T.BRAS" },
+{ "stageNo":  2, "stageName": "PAMPLEMOUSES" },
+{ "stageNo":  3, "stageName": "P.LOUIS" }
+]},
+  { "routeId": "56",         "routeName": "56",         "stages": [
+{ "stageNo":  0, "stageName": "R.D.REMPART" },
+{ "stageNo":  1, "stageName": "P.D'OR" },
+{ "stageNo":  2, "stageName": "GOODLANDS" }
+]}
+]

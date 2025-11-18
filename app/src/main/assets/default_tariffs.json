@@ -1,0 +1,11 @@
+[{ "minStages":   0, "maxStages":   1, "adult": 17, "child":  8, "student": 12 },
+  { "minStages":   2, "maxStages":   2, "adult": 24, "child": 12, "student": 14 },
+  { "minStages":   3, "maxStages":   4, "adult": 30, "child": 15, "student": 20 },
+  { "minStages":   5, "maxStages":   6, "adult": 35, "child": 16, "student": 20 },
+  { "minStages":   7, "maxStages":   8, "adult": 39, "child": 18, "student": 20 },
+  { "minStages":   9, "maxStages":  11, "adult": 41, "child": 19, "student": 20 },
+  { "minStages":  12, "maxStages":  12, "adult": 41, "child": 19, "student": 22 },
+  { "minStages":  13, "maxStages":  14, "adult": 44, "child": 20, "student": 22 },
+  { "minStages":  15, "maxStages":  22, "adult": 44, "child": 20, "student": 24 },
+  { "minStages":  23, "maxStages":  30, "adult": 44, "child": 20, "student": 24 },
+  { "minStages":  31, "maxStages": 200, "adult": 47, "child": 21, "student": 24 }]

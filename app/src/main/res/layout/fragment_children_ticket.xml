@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" >
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:background="#9AFF02A6"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/fare_row1"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingTop="20dp">
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/fare_row2"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingTop="10dp">
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/fare_row3"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingTop="10dp">
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:background="#9AFF02A6"
+        android:gravity="center_horizontal|center_vertical"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/btn_see_tariffs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="30dp"
+            android:layout_marginRight="30dp"
+            android:backgroundTint="#1bff00"
+            android:text="TARIFF"
+            android:textColor="#000000"
+            android:textSize="34sp"
+            app:cornerRadius="0dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/stage_selector"
+        android:layout_width="match_parent"
+        android:layout_height="115dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/button_left"
+            android:layout_width="74dp"
+            android:layout_height="74dp"
+            android:backgroundTint="#03A9F4"
+            android:paddingLeft="0dp"
+            android:paddingTop="0dp"
+            android:paddingRight="0dp"
+            android:paddingBottom="0dp"
+            android:text="@string/left"
+            android:textSize="34sp"
+            app:cornerRadius="0dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/view_stage"
+            android:layout_width="250dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:background="@drawable/textview_border"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:singleLine="true"
+            android:textColor="#000000"
+            android:textSize="38sp"
+            app:layout_constraintEnd_toStartOf="@id/button_right"
+            app:layout_constraintStart_toEndOf="@id/button_left"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Button
+            android:id="@+id/button_right"
+            android:layout_width="74dp"
+            android:layout_height="74dp"
+            android:backgroundTint="#03A9F4"
+            android:paddingLeft="0dp"
+            android:paddingTop="0dp"
+            android:paddingRight="0dp"
+            android:paddingBottom="0dp"
+            android:text="@string/right"
+            android:textSize="34sp"
+            app:cornerRadius="0dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="190dp"
+        android:gravity="center_vertical"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/btn_print"
+            android:layout_width="match_parent"
+            android:layout_height="90dp"
+            android:layout_marginLeft="30dp"
+            android:layout_marginRight="30dp"
+            android:layout_marginBottom="30dp"
+            android:backgroundTint="#FF0101"
+            android:text="ISSUE TICKET"
+            android:textSize="34sp"
+            app:cornerRadius="0dp" />
+
+        <Button
+            android:id="@+id/btn_menu"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="30dp"
+            android:layout_marginRight="30dp"
+            android:backgroundTint="#2196F3"
+            android:text="Menu"
+            android:textSize="34sp"
+            app:cornerRadius="0dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/total_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="Rs XXXX"
+            android:textAlignment="center"
+            android:textColor="#000000"
+            android:textSize="35sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btn_view_amount"
+            android:layout_width="100dp"
+            android:layout_height="match_parent"
+            android:backgroundTint="#00FFFFFF"
+            android:contentDescription="Amount Visibility"
+            android:padding="0dp"
+            android:paddingHorizontal="0dp"
+            android:paddingVertical="0dp"
+            android:paddingStart="0dp"
+            android:paddingLeft="0dp"
+            android:paddingTop="0dp"
+            android:paddingEnd="0dp"
+            android:paddingRight="0dp"
+            android:paddingBottom="0dp"
+            android:scaleType="fitCenter"
+            app:srcCompat="@drawable/baseline_remove_red_eye_24_black" />
+
+    </LinearLayout>
+
+</LinearLayout>

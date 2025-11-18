@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">AYB WAY</string>
+    <string name="title_activity_menu">Menu</string>
+    <string name="title_activity_print_test">PrintTest</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="left"><![CDATA[<]]></string>
+    <string name="right"><![CDATA[>]]></string>
+    <string name="well_meal"><![CDATA[Well & Meal]]></string>
+    <string name="aybway_logo">AYBWAY Logo</string>
+    <string name="back">Back</string>
+    <string name="print_report">Print Report</string>
+    <string name="menu">Menu</string>
+    <string name="current_trip">Current Trip</string>
+    <string name="all_trips">All Trips</string>
+    <string name="custom_trip">Custom Trip</string>
+    <string name="summary_report">SUMMARY REPORT</string>
+    <string name="trip_report">TRIP REPORT</string>
+    <string name="select_report_type">Select Report Type</string>
+    <string name="detailed_report">DETAILED REPORT</string>
+    <string name="submit">SUBMIT</string>
+    <string name="versioning">Version 1.3.0</string>
+
+</resources>

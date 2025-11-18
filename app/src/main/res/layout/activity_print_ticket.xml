@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".PrintTicket">
+
+    <LinearLayout
+        android:id="@+id/layout_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#99000000"
+        android:gravity="center_horizontal|center_vertical"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ProgressBar
+            android:id="@+id/progressBar2"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:indeterminateTint="#FFFFFF"
+            android:indeterminateTintMode="src_in" />
+    </LinearLayout>
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="2dp"
+        app:layout_constraintBottom_toTopOf="@+id/container"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tabGravity="fill"
+        app:tabMode="fixed"
+        app:tabIndicatorHeight="0dp"
+        app:tabIndicatorColor="@android:color/transparent"
+        app:tabRippleColor="@android:color/transparent"
+        app:tabTextAppearance="@style/TextAppearance.AppCompat.Large"
+        app:tabMinWidth="0dp"
+        app:tabMaxWidth="0dp"
+        app:tabPaddingStart="0dp"
+        app:tabPaddingEnd="0dp"
+        app:tabContentStart="0dp">
+
+        <com.google.android.material.tabs.TabItem
+            android:id="@+id/adult_tab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Adult" />
+
+        <com.google.android.material.tabs.TabItem
+            android:id="@+id/student_tab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Student" />
+
+        <com.google.android.material.tabs.TabItem
+            android:id="@+id/children_tab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Child" />
+    </com.google.android.material.tabs.TabLayout>
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tabLayout" />
+</androidx.constraintlayout.widget.ConstraintLayout>
