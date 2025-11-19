@@ -12,5 +12,7 @@
     <color name="child_tab_selected_bg">#9AFF02A6</color>
 
     <color name="selected_tariff_row">#2196F3</color>
+    <color name="fare_button_default">#3888FD</color>
+    <color name="fare_button_selected">#FF0101</color>
 
 </resources>
