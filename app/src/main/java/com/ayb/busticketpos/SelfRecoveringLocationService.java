@@ -8,7 +8,6 @@ import android.content.*;
 import android.content.pm.PackageManager;
 import android.os.*;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresPermission;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;

@@ -16,7 +16,7 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         CrashLogger.init(this);
-
+        MemoryWatchdog.init(this);
         Prefs.setLastAlive(this, System.currentTimeMillis());
 
 
@@ -30,17 +30,6 @@ public class App extends Application {
         }
 
         scheduleDailyFetch();
-    }
-
-    private void startHeartbeatMonitor(Context ctx) {
-        new Thread(() -> {
-            while (true) {
-                try {
-                    Prefs.setLastAlive(ctx, System.currentTimeMillis());
-                    Thread.sleep(60_000); // every 1 minute
-                } catch (InterruptedException ignored) {}
-            }
-        }, "App-Heartbeat").start();
     }
 
 

@@ -14,10 +14,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Global crash logger for BusTicketPOS.
- *  - Writes logs to Documents/BusTicketPOSLogs/
- *  - Keeps logs for 30 days
- *  - NO ANR WATCHDOG (removed for stability)
+ * Global crash and error logger for the BusTicketPOS app.
+ *  - Writes daily log files to Documents/BusTicketPOSLogs/
+ *  - Keeps logs for 30 days, then deletes older ones
+ *
+ * ANR watchdog has been removed. This logger only records uncaught exceptions
+ * and explicit logError() calls, on a lightweight background thread.
  */
 public class CrashLogger implements Thread.UncaughtExceptionHandler {
 
@@ -28,7 +30,7 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
     private final Context appContext;
     private final Thread.UncaughtExceptionHandler defaultHandler;
 
-    // lightweight single-thread logger
+    // Dedicated lightweight background thread for logging
     private final ExecutorService logExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "CrashLogger-Writer");
         t.setPriority(Thread.MIN_PRIORITY);
@@ -40,24 +42,19 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
         this.defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
     }
 
-    /** Initialize from Application.onCreate() */
+    /** Initialize once from Application.onCreate() */
     public static void init(Context context) {
         if (instance == null) {
             instance = new CrashLogger(context);
             Thread.setDefaultUncaughtExceptionHandler(instance);
             Log.i(TAG, "CrashLogger initialized");
             instance.cleanupOldLogs(LOG_RETENTION_DAYS);
-
-            // 🚫 REMOVED: ANR watchdog → improves stability & prevents false ANRs
-            // instance.startAnrWatchdog();  <-- Gone
         }
     }
 
     @Override
     public void uncaughtException(Thread t, Throwable e) {
         logException("Uncaught exception in " + t.getName(), e);
-
-        // Pass crash to Android normally
         if (defaultHandler != null) {
             defaultHandler.uncaughtException(t, e);
         }
@@ -71,28 +68,25 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
         }
     }
 
-    /** Non-blocking, safe crash logger */
+    /** Non-blocking, OOM-safe logger */
     private synchronized void logException(String tag, Throwable e) {
         logExecutor.execute(() -> {
             try {
+                // Skip if heap critically low (<5% free)
                 Runtime rt = Runtime.getRuntime();
-                float freeFraction = (float) rt.freeMemory() / rt.totalMemory();
-
-                // avoid write during low-memory
-                if (freeFraction < 0.05f) {
+                if ((float) rt.freeMemory() / rt.totalMemory() < 0.05f) {
                     Log.w(TAG, "Skipping log write: low memory");
                     return;
                 }
 
                 File logFile = getDailyLogFile();
-
                 try (FileWriter fw = new FileWriter(logFile, true);
                      PrintWriter pw = new PrintWriter(fw)) {
 
                     String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                             .format(new Date());
-
                     pw.println("===== " + ts + " =====");
+                    pw.println("Process: " + android.os.Process.myPid());
                     pw.println("Thread: " + Thread.currentThread().getName());
                     pw.println("Tag: " + tag);
                     pw.println("Message: " + e.getMessage());
@@ -100,10 +94,9 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
                     pw.println();
 
                     pw.flush();
-                    Log.i(TAG, "Logged to " + logFile.getAbsolutePath());
-
+                    Log.i(TAG, "Error logged to " + logFile.getAbsolutePath());
                 } catch (OutOfMemoryError oom) {
-                    Log.e(TAG, "Skipped log write due to OOM: " + oom.getMessage());
+                    Log.e(TAG, "Skipped file log due to OOM: " + oom.getMessage());
                 } catch (Exception ex) {
                     Log.e(TAG, "Failed to write crash log", ex);
                 }
@@ -115,23 +108,17 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
     }
 
     private File getDailyLogFile() {
-        File docsDir = Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOCUMENTS
-        );
+        File docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
         File logDir = new File(docsDir, "BusTicketPOSLogs");
         if (!logDir.exists()) logDir.mkdirs();
 
-        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                .format(new Date());
-
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         return new File(logDir, "crashlog-" + today + ".txt");
     }
 
     private void cleanupOldLogs(int days) {
         try {
-            File docsDir = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOCUMENTS
-            );
+            File docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
             File logDir = new File(docsDir, "BusTicketPOSLogs");
             if (!logDir.exists()) return;
 
@@ -139,23 +126,16 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
             long ttl = days * 24L * 60L * 60L * 1000L;
 
             File[] files = logDir.listFiles((dir, name) ->
-                    name != null &&
-                            name.startsWith("crashlog-") &&
-                            name.endsWith(".txt")
-            );
+                    name != null && name.startsWith("crashlog-") && name.endsWith(".txt"));
             if (files == null) return;
 
             int deleted = 0;
             for (File f : files) {
-                if (now - f.lastModified() > ttl && f.delete()) {
-                    deleted++;
-                }
+                if (now - f.lastModified() > ttl && f.delete()) deleted++;
             }
-
             if (deleted > 0) {
                 Log.i(TAG, "Cleanup: deleted " + deleted + " old log file(s)");
             }
-
         } catch (Exception e) {
             Log.w(TAG, "Cleanup failed", e);
         }
