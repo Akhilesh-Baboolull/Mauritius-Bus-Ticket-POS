@@ -299,10 +299,10 @@ public class Calculator extends AppCompatActivity {
 
         tvTotal.setText(String.format(Locale.getDefault(), "TOTAL: Rs %d", totalSelected));
 
-        if (totalSelected == 0) {
+        if (totalSelected == 0 || change == 0) {
             tvChange.setText("EXACT AMOUNT: Rs 0");
             tvChange.setBackgroundColor(Color.parseColor("#00BCD4")); // blue
-        } else if (change >= 0) {
+        } else if (change > 0) {
             tvChange.setText(String.format(Locale.getDefault(), "RETURN CHANGE: Rs %d", change));
             tvChange.setBackgroundColor(Color.parseColor("#82B645")); // green
         } else {
