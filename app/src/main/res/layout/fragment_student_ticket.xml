@@ -121,7 +121,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="190dp"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="vertical">
 
@@ -137,16 +137,41 @@
             android:textSize="34sp"
             app:cornerRadius="0dp" />
 
-        <Button
-            android:id="@+id/btn_menu"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="30dp"
-            android:layout_marginRight="30dp"
-            android:backgroundTint="#2196F3"
-            android:text="Menu"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            android:orientation="horizontal"
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp">
+
+            <Button
+                android:id="@+id/btn_calculator"
+                android:layout_width="0dp"
+                android:layout_height="80dp"
+                android:layout_marginRight="10dp"
+                android:layout_weight="1"
+                android:backgroundTint="#009688"
+                android:contentDescription="Calculator"
+                android:text=""
+                android:textSize="38sp"
+                app:cornerRadius="0dp"
+                app:icon="@drawable/calculator_icon_foreground"
+                app:iconPadding="0dp"
+                app:iconSize="120sp" />
+
+            <Button
+                android:id="@+id/btn_menu"
+                android:layout_width="0dp"
+                android:layout_height="80dp"
+                android:layout_marginLeft="10dp"
+                android:layout_weight="1"
+                android:backgroundTint="#2196F3"
+                android:text="@string/str_menu"
+                android:textSize="38sp"
+                app:cornerRadius="0dp"
+                app:iconPadding="0dp" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

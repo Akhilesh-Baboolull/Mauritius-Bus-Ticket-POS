@@ -15,18 +15,19 @@
         android:orientation="vertical">
 
         <TextView
-            android:id="@+id/tv_route"
+            android:id="@+id/tv_faretype"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="FROM → TO"
+            android:text="FARETYPE"
             android:textSize="16sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_meta"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="ADULT • 10:21"
+            android:gravity="center_vertical"
+            android:text="TIME • TRIP"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -34,7 +35,7 @@
         android:id="@+id/tv_amount"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Rs 25"
+        android:text="Rs X"
         android:textSize="20sp"
         android:textStyle="bold" />
 </LinearLayout>

@@ -75,8 +75,15 @@ public interface TicketDao {
     @Query("SELECT * FROM ticket_days WHERE date = :date ORDER BY id ASC")
     List<TicketDayEntity> getDaysForDate(String date);
 
-    @Query("SELECT * FROM tickets ORDER BY ticketId DESC LIMIT :limit")
-    List<TicketEntity> getLastTickets(int limit);
+    @Query(
+            "SELECT t.* " +
+                    "FROM tickets t " +
+                    "JOIN trips tr ON tr.tripId = t.tripId " +
+                    "WHERE tr.dayId = :dayId " +
+                    "ORDER BY t.ticketId DESC " +
+                    "LIMIT :limit"
+    )
+    List<TicketEntity> getLastTickets(int limit, int dayId);
 
     // 1) Is there an active day? (day_status = 1 equivalent)
     @Query("SELECT EXISTS(SELECT 1 FROM ticket_days WHERE end_time IS NULL OR end_time = '' LIMIT 1)")
