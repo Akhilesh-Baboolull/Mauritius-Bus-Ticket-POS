@@ -34,6 +34,7 @@ public final class PositioningClient {
                             @Nullable Integer tripNo,
                             @Nullable Integer batteryLevel,
                             Callback cb) {
+
         EXEC.execute(() -> {
             try {
                 JSONObject payload = new JSONObject()

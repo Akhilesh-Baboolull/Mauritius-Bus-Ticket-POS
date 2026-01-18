@@ -33,7 +33,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.zcs.sdk.DriverManager;
@@ -68,10 +67,9 @@ public class Adult_Ticket_Fragment extends Fragment {
     private Button btnRight;
     private TextView total_amount;
     private LinearLayout fareRow1, fareRow2, fareRow3;
-    private final List<Button> allFareButtons = new ArrayList<>();
+//    private final List<Button> allFareButtons = new ArrayList<>();
     private Button             selectedButton  = null;
     private String             fareValue       = "";
-
 
 
     // ─── Colors ────────────────────────────────────
@@ -81,9 +79,6 @@ public class Adult_Ticket_Fragment extends Fragment {
     private Printer       mPrinter;
     private Context       mContext;
 
-    //--------Pop up-------------
-// at top of class, alongside your other fields:
-    private Button       btnShowTariffs;
     private int          selectedTariffIndex  = -1;
     private String       selectedTariffStage;
     private int          selectedTariffAmount;
@@ -128,11 +123,13 @@ public class Adult_Ticket_Fragment extends Fragment {
         fareRow1  = root.findViewById(R.id.fare_row1);
         fareRow2  = root.findViewById(R.id.fare_row2);
         fareRow3  = root.findViewById(R.id.fare_row3);
-        btnShowTariffs = root.findViewById(R.id.btn_see_tariffs);
+        //--------Pop up-------------
+        // at top of class, alongside your other fields:
+        Button btnShowTariffs = root.findViewById(R.id.btn_see_tariffs);
         Button btn_back = root.findViewById(R.id.btn_menu);
         ImageButton btn_viewAmt = root.findViewById(R.id.btn_view_amount);
         total_amount = root.findViewById(R.id.total_amount);
-
+        Button btn_calculator = root.findViewById(R.id.btn_calculator);
 
         // 2️⃣ Colors
         defaultButtonColor  = Color.parseColor("#1bff00");
@@ -143,7 +140,7 @@ public class Adult_Ticket_Fragment extends Fragment {
         // ─── Printer ────────────────────────────────────
         DriverManager mDriverManager = DriverManager.getInstance();
         mPrinter       = mDriverManager.getPrinter();
-        boolean isSupportCutter = mPrinter.isSuppoerCutter();
+//        boolean isSupportCutter = mPrinter.isSuppoerCutter();
 
         Executors.newSingleThreadExecutor().execute(() -> {
             List<TariffRange> list = AppDatabase
@@ -211,20 +208,22 @@ public class Adult_Ticket_Fragment extends Fragment {
             getActivity().finish();
         });
 
+        btn_calculator.setOnClickListener(v -> startActivity(new Intent(mContext, Calculator.class)));
+
         btn_viewAmt.setOnTouchListener((v, event) -> {
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
+            return switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN -> {
                     // 👇 Show the total in the text view
                     showTotalAmountForToday(total_amount);
-                    return true;
-
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
+                    yield true;
+                }
+                case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     // 👇 Mask the amount when released
                     total_amount.setText("Rs XXXX");
-                    return true;
-            }
-            return false;
+                    yield true;
+                }
+                default -> false;
+            };
         });
 
 
@@ -372,6 +371,7 @@ public class Adult_Ticket_Fragment extends Fragment {
     }
 
     /** Refresh the stage‐display TextView & arrow enabled states */
+    @SuppressLint("SetTextI18n")
     private void updateStageDisplay() {
         if (stageNames.isEmpty()) {
             viewStage.setText("No stages");
@@ -428,7 +428,7 @@ public class Adult_Ticket_Fragment extends Fragment {
         fareRow1.removeAllViews();
         fareRow2.removeAllViews();
         fareRow3.removeAllViews();
-        allFareButtons.clear();
+//        allFareButtons.clear();
         selectedButton = null;
         fareValue      = "";
 
@@ -480,7 +480,7 @@ public class Adult_Ticket_Fragment extends Fragment {
             });
 
             row.addView(b);
-            allFareButtons.add(b);
+//            allFareButtons.add(b);
         }
     }
 
@@ -488,34 +488,19 @@ public class Adult_Ticket_Fragment extends Fragment {
      * Given a starting stage index, a selected fare, and a fare-type,
      * returns the furthest stage name reachable on the current route.
      *
-     * @param startIndex   zero-based index into the route’s stage list
-     * @param fareAmount   the user-selected fare (e.g. 30)
-     * @param fareType     one of "adult", "student", or "child"
+     * @param startIndex zero-based index into the route’s stage list
+     * @param fareAmount the user-selected fare (e.g. 30)
      * @return the stageName at destination, or null if something goes wrong
      */
     private @Nullable String calculateDestinationStage(
             int startIndex,
-            int fareAmount,
-            @NonNull String fareType
+            int fareAmount
     ) {
         if (allTariffRanges.isEmpty() || stageNos.isEmpty() || stageNames.isEmpty())
             return null;
 
         // 1️⃣ Find best matching range for fareType
-        TariffRange bestMatch = null;
-        for (TariffRange r : allTariffRanges) {
-            boolean match = false;
-            switch (fareType) {
-                case "adult":   match = r.adult == fareAmount; break;
-                case "student": match = r.student == fareAmount; break;
-                case "child":   match = r.child == fareAmount; break;
-            }
-            if (match) {
-                if (bestMatch == null || r.maxStages > bestMatch.maxStages) {
-                    bestMatch = r;
-                }
-            }
-        }
+        TariffRange bestMatch = getTariffRange(fareAmount);
 
         if (bestMatch == null) return null;
 
@@ -529,6 +514,21 @@ public class Adult_Ticket_Fragment extends Fragment {
 
         return stageNames.get(destinationIndex);
 
+    }
+
+    @Nullable
+    private TariffRange getTariffRange(int fareAmount) {
+        TariffRange bestMatch = null;
+        for (TariffRange r : allTariffRanges) {
+            boolean match = false;
+            match = r.adult == fareAmount;
+            if (match) {
+                if (bestMatch == null || r.maxStages > bestMatch.maxStages) {
+                    bestMatch = r;
+                }
+            }
+        }
+        return bestMatch;
     }
 
     /** Send the print job to the ZCS printer */
@@ -695,7 +695,7 @@ public class Adult_Ticket_Fragment extends Fragment {
         Prefs.saveTicketCount(mContext, ticketNo);
 
         String currentStage = stageNames.get(currentStageIndex);
-        String destination = calculateDestinationStage(currentStageIndex, Integer.valueOf(fareValue), "adult");
+        String destination = calculateDestinationStage(currentStageIndex, Integer.parseInt(fareValue));
 
         String currentDate = new SimpleDateFormat(
                 "dd/MM/yyyy", Locale.getDefault()
@@ -1157,7 +1157,7 @@ public class Adult_Ticket_Fragment extends Fragment {
     private void showTotalAmountForToday(@Nullable TextView targetView) {
         Executors.newSingleThreadExecutor().execute(() -> {
             AppDatabase db = AppDatabase.getInstance(requireContext());
-            String today = Prefs.getDayDate(requireContext());
+//            String today = Prefs.getDayDate(requireContext());
             String busNo = Prefs.getSelectedBus(requireContext());
 
 //            final Integer[] total = {db.ticketDao().getTotalAmountForDate(today, busNo)};
@@ -1181,7 +1181,7 @@ public class Adult_Ticket_Fragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        allFareButtons.clear();
+//        allFareButtons.clear();
         selectedButton = null;
     }
 }

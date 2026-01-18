@@ -471,7 +471,7 @@ public class Day extends AppCompatActivity {
 
                 // ✅ Submit / Start Day
                 btnSubmit.setOnClickListener(v -> {
-                    LocationForegroundService.sendNow(Day.this);
+
                     String selectedBus = busNos.get(currentIndex);
 
                     // • persist bus
@@ -542,6 +542,7 @@ public class Day extends AppCompatActivity {
                             }
                     );
 
+                    LocationForegroundService.sendNow(Day.this);
                     // • switch to “End Day” UI
                     startActivity(new Intent(Day.this, Menu.class)
                             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));

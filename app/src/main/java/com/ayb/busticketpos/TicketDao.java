@@ -3,7 +3,6 @@ package com.ayb.busticketpos;
 import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.Query;
-import androidx.room.Update;
 
 import java.util.List;
 
@@ -19,11 +18,11 @@ public interface TicketDao {
     @Query("SELECT * FROM tickets WHERE tripId = :tripId")
     List<TicketEntity> getTicketsForTrip(int tripId);
 
-    @Query("SELECT SUM(amount) FROM tickets WHERE tripId = :tripId")
-    int getTotalAmountForTrip(int tripId);
-
-    @Query("SELECT COUNT(*) FROM tickets WHERE tripId = :tripId AND fareType = :type")
-    int getTicketCountByType(int tripId, String type);
+//    @Query("SELECT SUM(amount) FROM tickets WHERE tripId = :tripId")
+//    int getTotalAmountForTrip(int tripId);
+//
+//    @Query("SELECT COUNT(*) FROM tickets WHERE tripId = :tripId AND fareType = :type")
+//    int getTicketCountByType(int tripId, String type);
 
     @Insert
     long insertDay(TicketDayEntity day);
@@ -31,8 +30,8 @@ public interface TicketDao {
     @Query("UPDATE ticket_days SET end_time = :time WHERE id = :id")
     void updateEndTime(String time, int id);
 
-    @Query("SELECT * FROM ticket_days WHERE date = :date AND busNo = :busNo LIMIT 1")
-    TicketDayEntity getDay(String date, String busNo);
+//    @Query("SELECT * FROM ticket_days WHERE date = :date AND busNo = :busNo LIMIT 1")
+//    TicketDayEntity getDay(String date, String busNo);
 
     @Query("SELECT * FROM trips ORDER BY tripId DESC LIMIT 1")
     TripEntity getLastTrip();
@@ -40,8 +39,8 @@ public interface TicketDao {
     @Query("UPDATE trips SET end_time = :date WHERE tripId = :id")
     void endTrip(String date, int id);
 
-    @Query(" SELECT SUM(t.amount) FROM tickets t INNER JOIN trips tr ON tr.tripId = t.tripId INNER JOIN ticket_days d ON d.id = tr.dayId WHERE d.date = :date AND d.busNo = :busNo")
-    Integer getTotalAmountForDate(String date, String busNo);
+//    @Query(" SELECT SUM(t.amount) FROM tickets t INNER JOIN trips tr ON tr.tripId = t.tripId INNER JOIN ticket_days d ON d.id = tr.dayId WHERE d.date = :date AND d.busNo = :busNo")
+//    Integer getTotalAmountForDate(String date, String busNo);
 
     @Query("SELECT IFNULL(SUM(t.amount), 0) FROM tickets t " +
             "INNER JOIN trips tr ON tr.tripId = t.tripId " +
@@ -58,8 +57,8 @@ public interface TicketDao {
     @Query("SELECT * FROM ticket_days ORDER BY id DESC LIMIT 1")
     TicketDayEntity getLastDay();
 
-    @Query("SELECT MAX(tripNo) FROM trips WHERE dayId = :dayId")
-    Integer getLastTripNoForDay(int dayId);
+//    @Query("SELECT MAX(tripNo) FROM trips WHERE dayId = :dayId")
+//    Integer getLastTripNoForDay(int dayId);
 
     @Query("SELECT td.busNo from trips t INNER JOIN ticket_days td ON t.dayId = td.id where t.tripId = :tripId")
     String getBusNoFromTrip(int tripId);
@@ -75,5 +74,24 @@ public interface TicketDao {
 
     @Query("SELECT * FROM ticket_days WHERE date = :date ORDER BY id ASC")
     List<TicketDayEntity> getDaysForDate(String date);
+
+    @Query("SELECT * FROM tickets ORDER BY ticketId DESC LIMIT :limit")
+    List<TicketEntity> getLastTickets(int limit);
+
+    // 1) Is there an active day? (day_status = 1 equivalent)
+    @Query("SELECT EXISTS(SELECT 1 FROM ticket_days WHERE end_time IS NULL OR end_time = '' LIMIT 1)")
+    int hasActiveDay();
+
+    // 2) Get latest active day row (for busNo + dayId)
+    @Query("SELECT * FROM ticket_days WHERE end_time IS NULL OR end_time = '' ORDER BY id DESC LIMIT 1")
+    TicketDayEntity getActiveDay();
+
+    // 3) Get latest active trip for a day (tripNo + route)
+    @Query("SELECT * FROM trips WHERE dayId = :dayId AND (end_time IS NULL OR end_time = '') ORDER BY tripId DESC LIMIT 1")
+    TripEntity getActiveTripForDay(int dayId);
+
+
+
+
 
 }

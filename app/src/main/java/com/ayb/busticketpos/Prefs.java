@@ -1,12 +1,8 @@
 package com.ayb.busticketpos;
 
-import android.content.ContentProvider;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
 
 public class Prefs {
     private static final String PREFS_NAME = "app_prefs";
@@ -27,7 +23,7 @@ public class Prefs {
     private static final String KEY_CURRENT_STAGE_ID = "current_stage_id";
     private static final String KEY_SERVER_CURRENT_DAY_ID = "current_server_day_id";
     private static final String KEY_SERVER_CURRENT_TRIP_ID = "current_server_trip_id";
-    private static final String KEY_DAY_START_TIME = "day_start_time";
+//    private static final String KEY_DAY_START_TIME = "day_start_time";
     private static final String KEY_DAY_END_TIME = "day_end_time";
     private static final String KEY_CURRENT_TRIP_REPORT_COUNT = "current_trip_report_count";
     private static final String KEY_ALL_TRIPS_REPORT_COUNT = "all_trips_report_count";
@@ -37,7 +33,7 @@ public class Prefs {
 
     public static void setLastAlive(Context ctx, long millis) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putLong(KEY_HEARTBEAT, millis).apply();
+        prefs.edit().putLong(KEY_HEARTBEAT, millis).commit();
     }
 
     public static long getLastAlive(Context ctx) {
@@ -45,16 +41,13 @@ public class Prefs {
         return prefs.getLong(KEY_HEARTBEAT, 0L);
     }
 
-    public static void initReportCount(Context ctx, String date){
+    public static void initReportCount(Context ctx){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-        String today = new SimpleDateFormat("dd/MM/yy", Locale.getDefault())
-                .format(new Date());
-
-        prefs.edit().putInt(KEY_CURRENT_TRIP_REPORT_COUNT, 0).apply();
-        prefs.edit().putInt(KEY_ALL_TRIPS_REPORT_COUNT, 0).apply();
-        prefs.edit().putInt(KEY_CUSTOM_TRIP_REPORT_COUNT, 0).apply();
-        prefs.edit().putInt(KEY_SUMMARY_REPORT_COUNT, 0).apply();
+        prefs.edit().putInt(KEY_CURRENT_TRIP_REPORT_COUNT, 0).commit();
+        prefs.edit().putInt(KEY_ALL_TRIPS_REPORT_COUNT, 0).commit();
+        prefs.edit().putInt(KEY_CUSTOM_TRIP_REPORT_COUNT, 0).commit();
+        prefs.edit().putInt(KEY_SUMMARY_REPORT_COUNT, 0).commit();
 
     }
 
@@ -80,22 +73,22 @@ public class Prefs {
 
     public static void incrementCurrentTrip(Context ctx){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_CURRENT_TRIP_REPORT_COUNT, prefs.getInt(KEY_CURRENT_TRIP_REPORT_COUNT,0) + 1).apply();
+        prefs.edit().putInt(KEY_CURRENT_TRIP_REPORT_COUNT, prefs.getInt(KEY_CURRENT_TRIP_REPORT_COUNT,0) + 1).commit();
     }
 
     public static void incrementAllTrips(Context ctx){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_ALL_TRIPS_REPORT_COUNT, prefs.getInt(KEY_ALL_TRIPS_REPORT_COUNT,0) + 1).apply();
+        prefs.edit().putInt(KEY_ALL_TRIPS_REPORT_COUNT, prefs.getInt(KEY_ALL_TRIPS_REPORT_COUNT,0) + 1).commit();
     }
 
     public static void incrementCustomTrip(Context ctx){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_CUSTOM_TRIP_REPORT_COUNT, prefs.getInt(KEY_CUSTOM_TRIP_REPORT_COUNT,0) + 1).apply();
+        prefs.edit().putInt(KEY_CUSTOM_TRIP_REPORT_COUNT, prefs.getInt(KEY_CUSTOM_TRIP_REPORT_COUNT,0) + 1).commit();
     }
 
     public static void incrementSummary(Context ctx){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_SUMMARY_REPORT_COUNT, prefs.getInt(KEY_SUMMARY_REPORT_COUNT,0) + 1).apply();
+        prefs.edit().putInt(KEY_SUMMARY_REPORT_COUNT, prefs.getInt(KEY_SUMMARY_REPORT_COUNT,0) + 1).commit();
     }
 
     public static int getCurrentServerDayID(Context ctx){
@@ -105,7 +98,7 @@ public class Prefs {
 
     public static void saveCurrentServerDayID(Context ctx, int dayID){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_SERVER_CURRENT_DAY_ID, dayID).apply();
+        prefs.edit().putInt(KEY_SERVER_CURRENT_DAY_ID, dayID).commit();
     }
 
     public static int getCurrentServerTripID(Context ctx){
@@ -115,7 +108,7 @@ public class Prefs {
 
     public static void saveCurrentServerTripID(Context ctx, int tripID){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_SERVER_CURRENT_TRIP_ID, tripID).apply();
+        prefs.edit().putInt(KEY_SERVER_CURRENT_TRIP_ID, tripID).commit();
     }
 
     public static int getCurrentStageID(Context ctx){
@@ -125,7 +118,7 @@ public class Prefs {
 
     public static void saveCurrentStageID(Context ctx, int stageID){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_CURRENT_STAGE_ID, stageID).apply();
+        prefs.edit().putInt(KEY_CURRENT_STAGE_ID, stageID).commit();
     }
 
     public static int getTicketCount(Context ctx){
@@ -135,20 +128,20 @@ public class Prefs {
 
     public static void saveTicketCount(Context ctx, int ticket_count){
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_TICKET_COUNT, ticket_count).apply();
+        prefs.edit().putInt(KEY_TICKET_COUNT, ticket_count).commit();
     }
 
     public static void SaveDay(Context ctx, String date, int day_status){
 
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putString(KEY_DAY_DATE, date).apply();
-        prefs.edit().putInt(KEY_DAY_STATUS, day_status).apply();
-        prefs.edit().putInt(KEY_TRIP_STATUS, 0).apply();
-        prefs.edit().putInt(KEY_TRIP_COUNT, 0).apply();
-        prefs.edit().putInt(KEY_TICKET_COUNT, 0).apply();
-        prefs.edit().putString(KEY_DAY_END_TIME, "").apply();
+        prefs.edit().putString(KEY_DAY_DATE, date).commit();
+        prefs.edit().putInt(KEY_DAY_STATUS, day_status).commit();
+        prefs.edit().putInt(KEY_TRIP_STATUS, 0).commit();
+        prefs.edit().putInt(KEY_TRIP_COUNT, 0).commit();
+        prefs.edit().putInt(KEY_TICKET_COUNT, 0).commit();
+        prefs.edit().putString(KEY_DAY_END_TIME, "").commit();
 
-        initReportCount(ctx, date);
+        initReportCount(ctx);
     }
 
     public static String getDayDate(Context ctx){
@@ -175,7 +168,7 @@ public class Prefs {
                 .remove(KEY_CURRENT_STAGE_ID)
                 .remove(KEY_SERVER_CURRENT_DAY_ID)
                 .remove(KEY_SERVER_CURRENT_TRIP_ID)
-                .apply();
+                .commit();
     }
 
     /** Save the selected bus number */
@@ -183,7 +176,7 @@ public class Prefs {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
                 .putString(KEY_SELECTED_BUS, busNo)
-                .apply();
+                .commit();
     }
 
     /** Retrieve the saved bus number, or null */
@@ -197,7 +190,7 @@ public class Prefs {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
                 .remove(KEY_SELECTED_BUS)
-                .apply();
+                .commit();
     }
 
     /** Save the selected route ID */
@@ -205,7 +198,7 @@ public class Prefs {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
                 .putString(KEY_SELECTED_ROUTE, routeId)
-                .apply();
+                .commit();
     }
 
     /** Get the saved route ID */
@@ -219,7 +212,7 @@ public class Prefs {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
                 .putString(KEY_SELECTED_ROUTE_NAME, routeName)
-                .apply();
+                .commit();
     }
 
     /** Get the saved route *name* */
@@ -229,18 +222,18 @@ public class Prefs {
     }
 
     /** Clear route ID & name */
-    public static void clearSelectedRoute(Context ctx) {
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit()
-                .remove(KEY_SELECTED_ROUTE)
-                .remove(KEY_SELECTED_ROUTE_NAME)
-                .apply();
-    }
+//    public static void clearSelectedRoute(Context ctx) {
+//        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+//        prefs.edit()
+//                .remove(KEY_SELECTED_ROUTE)
+//                .remove(KEY_SELECTED_ROUTE_NAME)
+//                .commit();
+//    }
 
     /** Save the current trip status (0 or 1) */
     public static void saveTripStatus(Context ctx, int status) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_TRIP_STATUS, status).apply();
+        prefs.edit().putInt(KEY_TRIP_STATUS, status).commit();
     }
     /** Get the current trip status (default 0) */
     public static int getTripStatus(Context ctx) {
@@ -251,7 +244,7 @@ public class Prefs {
     /** Save the total number of trips so far */
     public static void saveTripCount(Context ctx, int count) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(KEY_TRIP_COUNT, count).apply();
+        prefs.edit().putInt(KEY_TRIP_COUNT, count).commit();
     }
     /** Get how many trips have been started (default 0) */
     public static int getTripCount(Context ctx) {
@@ -268,7 +261,7 @@ public class Prefs {
                 .remove(KEY_SELECTED_ROUTE_NAME)
                 .remove(KEY_ROUTE_DIRECTION)
                 .remove(KEY_SELECTED_DIRECTION_NAME)
-                .apply();
+                .commit();
     }
 
     /** Save the chosen direction: 1 or –1 */
@@ -276,7 +269,7 @@ public class Prefs {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
                 .putInt(KEY_ROUTE_DIRECTION, direction)
-                .apply();
+                .commit();
     }
 
     /** Get the saved direction (default 0 = none) */
@@ -286,18 +279,18 @@ public class Prefs {
     }
 
     /** Clear the saved direction */
-    public static void clearRouteDirection(Context ctx) {
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit()
-                .remove(KEY_ROUTE_DIRECTION)
-                .apply();
-    }
+//    public static void clearRouteDirection(Context ctx) {
+//        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+//        prefs.edit()
+//                .remove(KEY_ROUTE_DIRECTION)
+//                .commit();
+//    }
 
     public static void saveDirectionName(Context ctx, String directionName) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
                 .putString(KEY_SELECTED_DIRECTION_NAME, directionName)
-                .apply();
+                .commit();
     }
 
     public static String getSelectedDirectionName(Context ctx) {
@@ -315,7 +308,7 @@ public class Prefs {
         ctx.getSharedPreferences("prefs", Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean("boot_ready", ready)
-                .apply();
+                .commit();
     }
 
 
