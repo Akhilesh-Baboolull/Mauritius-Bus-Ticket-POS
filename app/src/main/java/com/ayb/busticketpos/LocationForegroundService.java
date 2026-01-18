@@ -1,22 +1,19 @@
-// LocationForegroundService.java
 package com.ayb.busticketpos;
 
-import android.Manifest;
-import android.annotation.SuppressLint;
-import android.app.*;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.BatteryManager;
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.PowerManager;
+import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresPermission;
-import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -25,335 +22,334 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.CancellationTokenSource;
 
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class LocationForegroundService extends Service {
 
-    public static final String CHANNEL_ID = "ayb_location_channel";
+    private static final String TAG = "LocationFG";
+    private static final String CH_ID = "loc_fg";
+    private static final int NOTIF_ID = 101;
 
-    // NEW: special action to force an immediate send
-    private static final String ACTION_SEND_NOW = "com.ayb.busticketpos.action.SEND_NOW";
+    // Keep your existing actions/method names
+    private static final String ACTION_SEND_NOW     = "com.ayb.busticketpos.action.SEND_NOW";
     private static final String ACTION_SEND_DAY_END = "com.ayb.busticketpos.action.SEND_DAY_END";
+    private static final String ACTION_STOP         = "com.ayb.busticketpos.action.STOP";
 
     private FusedLocationProviderClient fused;
     private LocationCallback callback;
 
-    // at class top
-    private static final int MODE_DAY_ACTIVE = 1;   // 30s
-    private static final int MODE_IDLE       = 0;   // 5min
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
 
-    private int lastAppliedMode = -1;               // unknown at start
+    // mode = dayActive? (30s/5min)
+    private boolean lastDayActive = false;
+    private boolean modeAppliedOnce = false;
 
+    // Cache “state” so payload stays stable until status changes,
+    // BUT allow forced refresh for SEND_NOW / SEND_DAY_END.
+    private volatile BgState cachedState = null;
+    private volatile long cachedAtMs = 0L;
+    private static final long STATE_CACHE_MS = 15_000L; // stable + low DB load
 
+    // ---------------------------------------------------------------------
+    // DROP-IN PUBLIC API (existing call sites)
+    // ---------------------------------------------------------------------
 
-    /** Start normal foreground tracking (same as before) */
     public static void startIfNeeded(Context ctx) {
-        Intent i = new Intent(ctx, LocationForegroundService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ctx.startForegroundService(i);
-        } else {
-            ctx.startService(i);
-        }
+        // Minimum-change: always start; service chooses 30s/5min from DB.
+        start(ctx);
     }
 
-    /** Stop service */
+    public static void start(Context ctx) {
+        Context app = ctx.getApplicationContext();
+        Intent i = new Intent(app, LocationForegroundService.class);
+        app.startForegroundService(i);
+    }
+
     public static void stop(Context ctx) {
-        ctx.stopService(new Intent(ctx, LocationForegroundService.class));
+        Context app = ctx.getApplicationContext();
+        Intent i = new Intent(app, LocationForegroundService.class).setAction(ACTION_STOP);
+        app.startForegroundService(i);
     }
 
-    /** NEW: Trigger a one-shot send immediately (no waiting for the 60s interval) */
     public static void sendNow(Context ctx) {
-        Intent i = new Intent(ctx, LocationForegroundService.class).setAction(ACTION_SEND_NOW);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ctx.startForegroundService(i);
-        } else {
-            ctx.startService(i);
-        }
+        Context app = ctx.getApplicationContext();
+        Intent i = new Intent(app, LocationForegroundService.class).setAction(ACTION_SEND_NOW);
+        app.startForegroundService(i);
     }
 
-    @RequiresPermission(allOf = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION})
+    public static void sendOnDayEnd(Context ctx) {
+        Context app = ctx.getApplicationContext();
+        Intent i = new Intent(app, LocationForegroundService.class).setAction(ACTION_SEND_DAY_END);
+        app.startForegroundService(i);
+    }
+
+    // ---------------------------------------------------------------------
+
     @Override
     public void onCreate() {
         super.onCreate();
 
-        try {
-            // ✅ Step 1: Create notification channel first
-            createChannel();
+        ensureChannel();
+        startForeground(NOTIF_ID, buildNotif("Tracking enabled"));
 
-            // ✅ Step 2: Immediately call startForeground() — must be within 5 seconds
-            Notification notif = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("AYB Way - Location active")
-                    .setContentText("Sending bus position every minute")
-                    .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .setOngoing(true)
-                    .build();
-            startForeground(1011, notif);
+        fused = LocationServices.getFusedLocationProviderClient(this);
 
-        } catch (Exception e) {
-            android.util.Log.e("LocationService", "Failed to start foreground safely: " + e.getMessage(), e);
-            // If foreground start fails, stop the service to prevent system crash
-            stopSelf();
-            return;
-        }
-
-        try {
-            // ✅ Step 3: Initialize fused location client safely
-            fused = LocationServices.getFusedLocationProviderClient(this);
-            applyModeFromPrefs();
-        } catch (Throwable t) {
-            android.util.Log.e("LocationService", "FusedLocation init failed: " + t.getMessage(), t);
-        }
-
-        // ✅ Step 4: Watchdog for periodic forced sends (every 5 minutes)
-        Handler watchdog = new Handler(getMainLooper());
-        watchdog.postDelayed(new Runnable() {
-            @SuppressLint({"ScheduleExactAlarm", "MissingPermission"})
+        callback = new LocationCallback() {
             @Override
-            public void run() {
-                try {
-                    if (hasPerms()) {
-                        sendImmediateOnce();
-                    } else {
-                        android.util.Log.w("LocationService", "Watchdog skipped: missing location permission");
-                    }
-                } catch (Exception e) {
-                    android.util.Log.e("LocationService", "Watchdog exception: " + e.getMessage(), e);
-                }
-                // Re-schedule itself
-                watchdog.postDelayed(this, 300_000L);
+            public void onLocationResult(@NonNull LocationResult locationResult) {
+                Location loc = locationResult.getLastLocation();
+                if (loc == null) return;
+
+                // Normal periodic sends: cached state is ok (stable payload).
+                postLocation(loc, false);
+
+                // Update mode if DB day status changed.
+                applyModeFromDbIfNeeded(false);
             }
-        }, 300_000L);
+        };
 
-        // ✅ Step 5: Heartbeat loop with wake-lock protection
-        try {
-            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-            if (pm == null) {
-                android.util.Log.w("LocationService", "PowerManager null — skipping heartbeat setup");
-                return;
-            }
-
-            PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AYB:Heartbeat");
-            Handler h = new Handler(getMainLooper());
-            final Runnable[] heartbeat = new Runnable[1];
-
-            heartbeat[0] = () -> {
-                try {
-                    wl.acquire(30_000L); // hold for 30 seconds max
-                    if (hasPerms()) {
-                        sendImmediateOnce();
-                    } else {
-                        android.util.Log.w("LocationService", "Heartbeat skipped: missing location permission");
-                    }
-                } catch (SecurityException se) {
-                    android.util.Log.e("LocationService", "SecurityException during heartbeat send: " + se.getMessage());
-                } catch (Throwable t) {
-                    android.util.Log.e("LocationService", "Heartbeat exception: " + t.getMessage(), t);
-                } finally {
-                    if (wl.isHeld()) wl.release();
-                }
-
-                // Re-schedule every 5 minutes
-                h.postDelayed(heartbeat[0], 300_000L);
-            };
-
-            // Start heartbeat loop after 5 minutes
-            h.postDelayed(heartbeat[0], 300_000L);
-
-        } catch (Throwable t) {
-            android.util.Log.e("LocationService", "Heartbeat setup failed: " + t.getMessage(), t);
-        }
-
-        android.util.Log.i("LocationService", "Foreground service created successfully");
+        // Apply mode once at startup.
+        applyModeFromDbIfNeeded(true);
     }
 
-
-    @RequiresPermission(allOf = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION})
-    private void applyModeFromPrefs() {
-        int modeNow = (Prefs.getDayStatus(this) == 1) ? MODE_DAY_ACTIVE : MODE_IDLE;
-        if (modeNow != lastAppliedMode) {
-            startLocationUpdatesForMode(modeNow);
-        }
-    }
-
-
-    /** NEW: handle ACTION_SEND_NOW to perform one-shot sending */
-    @SuppressLint({"MissingPermission", "ScheduleExactAlarm"})
-    @RequiresPermission(allOf = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION})
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+
         if (intent != null) {
             String action = intent.getAction();
+
+            if (ACTION_STOP.equals(action)) {
+                stopSelfSafely();
+                return START_NOT_STICKY;
+            }
+
             if (ACTION_SEND_NOW.equals(action)) {
-                sendImmediateOnce();  // respect dayStatus
-            } else if (ACTION_SEND_DAY_END.equals(action)) {
-                sendImmediateOnce();   // override dayStatus
+                // Force refresh state (don’t use cached payload)
+                sendImmediateOnce(true);
+            }
+
+            if (ACTION_SEND_DAY_END.equals(action)) {
+                // Day just ended: force refresh so busNo/tripNo/route are nulled correctly.
+                sendImmediateOnce(true);
             }
         }
-        // Also re-check mode in case Prefs changed while we were stopped/restarted
-        applyModeFromPrefs();
+
+        // In case DB day status changed while service was alive, re-apply mode.
+        applyModeFromDbIfNeeded(false);
+
         return START_STICKY;
     }
-
-
-    public static void sendOnDayEnd(Context ctx) {
-        Intent i = new Intent(ctx, LocationForegroundService.class)
-                .setAction("com.ayb.busticketpos.action.SEND_DAY_END");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ctx.startForegroundService(i);
-        } else {
-            ctx.startService(i);
-        }
-    }
-
-    @RequiresPermission(allOf = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION})
-    private void startLocationUpdatesForMode(int mode) {
-        if (!hasPerms()) { stopSelf(); return; }
-
-        // ⏱️ Update intervals
-        long intervalMs = (mode == MODE_DAY_ACTIVE) ? 30_000L : 300_000L; // 30s vs 5min
-
-        // ⚙️ Choose priority based on mode
-        int priority = (mode == MODE_DAY_ACTIVE)
-                ? Priority.PRIORITY_HIGH_ACCURACY       // 🚀 More reliable during trips
-                : Priority.PRIORITY_LOW_POWER;           // 🌙 Save battery during idle
-
-        // 🧭 Build request dynamically
-        LocationRequest req = new LocationRequest.Builder(intervalMs)
-                .setMinUpdateIntervalMillis(intervalMs)
-                .setPriority(priority)
-                .build();
-
-        // 👂 Callback creation or reuse
-        if (callback == null) {
-            callback = new LocationCallback() {
-                @RequiresPermission(allOf = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION})
-                @Override public void onLocationResult(LocationResult result) {
-                    if (result == null) return;
-
-                    Location loc = result.getLastLocation();
-                    if (loc != null) postLocation(loc);
-
-                    // 🔁 Re-evaluate mode in case "day" status changed
-                    applyModeFromPrefs();
-                }
-            };
-        } else {
-            // Remove old updates before re-registering with new interval/priority
-            fused.removeLocationUpdates(callback);
-        }
-
-        fused.requestLocationUpdates(req, callback, getMainLooper());
-        lastAppliedMode = mode;
-
-        android.util.Log.d("LocationService", "Started location updates. Mode="
-                + (mode == MODE_DAY_ACTIVE ? "DAY_ACTIVE" : "IDLE")
-                + ", priority=" + priority);
-    }
-
-
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (fused != null && callback != null) {
-            fused.removeLocationUpdates(callback);
-            callback = null; // 🧹 allow GC to reclaim memory
-        }
+        try { if (fused != null && callback != null) fused.removeLocationUpdates(callback); } catch (Exception ignored) {}
+        io.shutdown();
     }
 
-    @Nullable @Override
+    @Nullable
+    @Override
     public IBinder onBind(Intent intent) { return null; }
 
-    private void createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(
-                    CHANNEL_ID, "Location", NotificationManager.IMPORTANCE_LOW);
-            ch.setDescription("Background location for bus positioning");
-            NotificationManager nm = getSystemService(NotificationManager.class);
-            nm.createNotificationChannel(ch);
-        }
+    // ---------------------------------------------------------------------
+    // DB-driven mode logic (30s when day active, else 5 min)
+    // ---------------------------------------------------------------------
+
+    private void applyModeFromDbIfNeeded(boolean force) {
+        io.execute(() -> {
+            boolean dayActive = BgStateRepo.isDayActive(getApplicationContext());
+
+            // Mode changes = invalidate cached payload so it updates quickly
+            if (modeAppliedOnce && dayActive != lastDayActive) {
+                invalidateStateCache();
+            }
+
+            if (!force && modeAppliedOnce && dayActive == lastDayActive) return;
+
+            lastDayActive = dayActive;
+            modeAppliedOnce = true;
+
+            LocationRequest req = buildRequest(dayActive);
+
+            try { fused.removeLocationUpdates(callback); } catch (Exception ignored) {}
+
+            try {
+                fused.requestLocationUpdates(req, callback, getMainLooper());
+                Log.d(TAG, "Mode applied dayActive=" + dayActive + " interval=" + (dayActive ? "30s" : "5min"));
+            } catch (SecurityException se) {
+                Log.e(TAG, "Missing location permission", se);
+            }
+        });
     }
 
-    /** NEW: one-shot get + send (no timer) */
-    @SuppressLint("ScheduleExactAlarm")
-    @RequiresPermission(allOf = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.SCHEDULE_EXACT_ALARM})
-    /** one-shot get + send (dayEnd = true overrides status) */
-    private void sendImmediateOnce() {
+    private LocationRequest buildRequest(boolean dayActive) {
+        long intervalMs = dayActive ? 30_000L : 300_000L;
 
-        if (!hasPerms()) return;
+        int priority = dayActive
+                ? Priority.PRIORITY_HIGH_ACCURACY
+                : Priority.PRIORITY_BALANCED_POWER_ACCURACY;
 
-        CancellationTokenSource cts = new CancellationTokenSource();
-        fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.getToken())
-                .addOnSuccessListener(loc -> {
-                    if (loc != null) {
-                        postLocation(loc);
-                    } else {
-                        fused.getLastLocation().addOnSuccessListener(last -> {
-                            if (last != null) postLocation(last);
-                        });
-                    }
-                });
-
-        AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
-        Intent i = new Intent(this, LocationForegroundService.class).setAction(ACTION_SEND_NOW);
-        PendingIntent pi = PendingIntent.getService(this, 0, i, PendingIntent.FLAG_IMMUTABLE);
-        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + 5 * 60 * 1000, pi);
-
+        return new LocationRequest.Builder(priority, intervalMs)
+                .setMinUpdateIntervalMillis(intervalMs)
+                // allow some batching when inactive for better battery
+                .setMaxUpdateDelayMillis(dayActive ? intervalMs : 2 * intervalMs)
+                .build();
     }
 
+    // ---------------------------------------------------------------------
+    // One-shot send (prefer current location)
+    // ---------------------------------------------------------------------
 
-    /** Build payload + send via PositioningClient */
-    private void postLocation(Location loc) {
-        String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-                .format(new java.util.Date());
-
-        String tenantStr  = PrefsSecure.getTenantId(this);
-        String machineStr = PrefsSecure.getMachineId(this);
-        String busNo      = Prefs.getSelectedBus(this);
-        if (busNo == null) busNo = null; // server requires non-empty; empty will fail fast
-
-        String currentRoute = Prefs.getSelectedRouteName(this);
-        if (currentRoute != null && currentRoute.trim().isEmpty()) currentRoute = null;
-
-        Integer tripNo = null;
+    private void sendImmediateOnce(boolean forceRefreshState) {
         try {
-            int t = Prefs.getTripCount(this);
-            if (t > 0) tripNo = t;
-        } catch (Exception ignored) {}
+            CancellationTokenSource cts = new CancellationTokenSource();
+            fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.getToken())
+                    .addOnSuccessListener(loc -> {
+                        if (loc != null) {
+                            postLocation(loc, forceRefreshState);
+                        } else {
+                            fused.getLastLocation().addOnSuccessListener(last -> {
+                                if (last != null) postLocation(last, forceRefreshState);
+                            });
+                        }
+                    });
+        } catch (SecurityException ignored) {}
+    }
 
-        int tenantId, machineId;
-        try {
-            tenantId  = Integer.parseInt(tenantStr);
-            machineId = Integer.parseInt(machineStr);
-        } catch (Exception e) {
-            return; // not registered
+    // ---------------------------------------------------------------------
+    // Payload send: shape fields exactly as your server rules require
+    // ---------------------------------------------------------------------
+
+    private void postLocation(Location loc, boolean forceRefreshState) {
+
+        final String tenantStr  = PrefsSecure.getTenantId(this);
+        final String machineStr = PrefsSecure.getMachineId(this);
+
+        final String latLng = loc.getLatitude() + ", " + loc.getLongitude();
+        final int batteryPct = getBatteryPct();
+
+        io.execute(() -> {
+            int tenantId, machineId;
+            try {
+                tenantId  = Integer.parseInt(tenantStr);
+                machineId = Integer.parseInt(machineStr);
+            } catch (Exception e) {
+                return;
+            }
+
+            String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    .format(new Date());
+
+            BgState st = getState(forceRefreshState);
+
+            // ✅ Apply your exact rules:
+            final boolean dayActive  = st.dayActive;
+            final boolean tripActive = st.tripActive;
+
+            final String busNo;
+            final String route;
+            final Integer tripNo;
+
+            if (!dayActive) {
+                // Day inactive: only core fields
+                busNo = null;
+                route = null;
+                tripNo = null;
+            } else if (!tripActive) {
+                // Day active, trip inactive: include bus only
+                busNo = st.busNo;
+                route = null;
+                tripNo = null;
+            } else {
+                // Trip active: include bus + route + tripNo
+                busNo = st.busNo;
+                route = st.currentRoute;
+                tripNo = st.tripNo;
+            }
+
+            // Debug (optional)
+            // Log.d("BUS_DEBUG", "payloadState day=" + dayActive + " trip=" + tripActive +
+            //         " bus=[" + busNo + "] route=[" + route + "] tripNo=[" + tripNo + "]");
+
+            PositioningClient.send(
+                    getApplicationContext(),
+                    date,
+                    tenantId,
+                    machineId,
+                    busNo,        // null when day inactive
+                    latLng,
+                    route,        // null unless trip active
+                    tripNo,       // null unless trip active
+                    batteryPct,
+                    null
+            );
+        });
+    }
+
+    // ---------------------------------------------------------------------
+    // State cache
+    // ---------------------------------------------------------------------
+
+    private BgState getState(boolean forceRefresh) {
+        long now = System.currentTimeMillis();
+
+        if (!forceRefresh) {
+            BgState st = cachedState;
+            if (st != null && (now - cachedAtMs) <= STATE_CACHE_MS) return st;
         }
 
-        String latLng = loc.getLatitude() + ", " + loc.getLongitude();
+        BgState fresh = BgStateRepo.read(getApplicationContext());
+        cachedState = fresh;
+        cachedAtMs = now;
+        return fresh;
+    }
 
+    private void invalidateStateCache() {
+        cachedState = null;
+        cachedAtMs = 0L;
+    }
+
+    private int getBatteryPct() {
         BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE);
-        int batteryPct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
-
-        PositioningClient.send(
-                this,
-                date, tenantId, machineId, busNo,
-                latLng,
-                currentRoute,
-                tripNo,
-                batteryPct,
-                null // no callback needed
-        );
+        if (bm == null) return 0;
+        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
     }
 
-    private boolean hasPerms() {
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    private void stopSelfSafely() {
+        try { if (fused != null && callback != null) fused.removeLocationUpdates(callback); } catch (Exception ignored) {}
+        stopForeground(true);
+        stopSelf();
+    }
+
+    // ---------------------------------------------------------------------
+    // Notification
+    // ---------------------------------------------------------------------
+
+    private void ensureChannel() {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (nm == null) return;
+
+        NotificationChannel ch = new NotificationChannel(
+                CH_ID,
+                "Background Location",
+                NotificationManager.IMPORTANCE_LOW
+        );
+        nm.createNotificationChannel(ch);
+    }
+
+    private Notification buildNotif(String text) {
+        return new NotificationCompat.Builder(this, CH_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground) // change to R.mipmap.ic_launcher if needed
+                .setContentTitle("Bus Ticket POS")
+                .setContentText(text)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build();
     }
 }

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical" >
@@ -57,7 +56,7 @@
             android:layout_marginLeft="30dp"
             android:layout_marginRight="30dp"
             android:backgroundTint="#1bff00"
-            android:text="TARIFF"
+            android:text="@string/tariff"
             android:textColor="#000000"
             android:textSize="34sp"
             app:cornerRadius="0dp" />
@@ -120,7 +119,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="190dp"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="vertical">
 
@@ -132,20 +131,46 @@
             android:layout_marginRight="30dp"
             android:layout_marginBottom="30dp"
             android:backgroundTint="#FF0101"
-            android:text="ISSUE TICKET"
+            android:text="@string/issue_ticket"
             android:textSize="34sp"
             app:cornerRadius="0dp" />
 
-        <Button
-            android:id="@+id/btn_menu"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="30dp"
-            android:layout_marginRight="30dp"
-            android:backgroundTint="#2196F3"
-            android:text="Menu"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            android:orientation="horizontal"
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp">
+
+            <Button
+                android:id="@+id/btn_calculator"
+                android:layout_width="0dp"
+                android:layout_height="80dp"
+                android:layout_marginRight="10dp"
+                android:layout_weight="1"
+                android:backgroundTint="#009688"
+                android:contentDescription="Calculator"
+                android:text=""
+                android:textSize="38sp"
+                app:cornerRadius="0dp"
+                app:icon="@drawable/calculator_icon_foreground"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="120sp" />
+
+            <Button
+                android:id="@+id/btn_menu"
+                android:layout_width="0dp"
+                android:layout_height="80dp"
+                android:layout_marginLeft="10dp"
+                android:layout_weight="1"
+                android:backgroundTint="#2196F3"
+                android:text="@string/str_menu"
+                android:textSize="38sp"
+                app:cornerRadius="0dp"
+                app:iconPadding="0dp" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
@@ -157,10 +182,10 @@
 
         <TextView
             android:id="@+id/total_amount"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:text="Rs XXXX"
+            android:text="@string/hidden_amount"
             android:textAlignment="center"
             android:textColor="#000000"
             android:textSize="35sp"
@@ -171,7 +196,7 @@
             android:layout_width="100dp"
             android:layout_height="match_parent"
             android:backgroundTint="#00FFFFFF"
-            android:contentDescription="Amount Visibility"
+            android:contentDescription="@string/amount_visibility"
             android:padding="0dp"
             android:paddingHorizontal="0dp"
             android:paddingVertical="0dp"
