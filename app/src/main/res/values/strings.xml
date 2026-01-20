@@ -24,5 +24,6 @@
     <string name="issue_ticket">ISSUE TICKET</string>
     <string name="str_menu">Menu</string>
     <string name="hidden_amount">Rs XXXX</string>
+    <string name="amount_visibility">Amount Visibility</string>
 
 </resources>

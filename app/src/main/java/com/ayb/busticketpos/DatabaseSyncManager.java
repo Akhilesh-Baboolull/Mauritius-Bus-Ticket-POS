@@ -99,6 +99,9 @@ public class DatabaseSyncManager {
                 // ---- Routes + Stages ----
                 try {
                     String routesJson = HttpUtil.postJson("https://cloud.aybway.com/api/routes.php", body);
+
+                    Log.d("DB debug", routesJson);
+
                     if (routesJson != null && !routesJson.isEmpty()) {
                         Type rwsType = new TypeToken<List<AppDatabase.RouteWithStages>>() {}.getType();
                         List<AppDatabase.RouteWithStages> rwsList = gson.fromJson(routesJson, rwsType);
