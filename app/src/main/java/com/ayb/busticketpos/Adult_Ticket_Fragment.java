@@ -210,20 +210,18 @@ public class Adult_Ticket_Fragment extends Fragment {
 
         btn_calculator.setOnClickListener(v -> startActivity(new Intent(mContext, Calculator.class)));
 
-        btn_viewAmt.setOnTouchListener((v, event) -> {
-            return switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN -> {
-                    // 👇 Show the total in the text view
-                    showTotalAmountForToday(total_amount);
-                    yield true;
-                }
-                case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    // 👇 Mask the amount when released
-                    total_amount.setText("Rs XXXX");
-                    yield true;
-                }
-                default -> false;
-            };
+        btn_viewAmt.setOnTouchListener((v, event) -> switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN -> {
+                // 👇 Show the total in the text view
+                showTotalAmountForToday(total_amount);
+                yield true;
+            }
+            case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                // 👇 Mask the amount when released
+                total_amount.setText("Rs XXXX");
+                yield true;
+            }
+            default -> false;
         });
 
 
@@ -520,7 +518,7 @@ public class Adult_Ticket_Fragment extends Fragment {
     private TariffRange getTariffRange(int fareAmount) {
         TariffRange bestMatch = null;
         for (TariffRange r : allTariffRanges) {
-            boolean match = false;
+            boolean match;
             match = r.adult == fareAmount;
             if (match) {
                 if (bestMatch == null || r.maxStages > bestMatch.maxStages) {

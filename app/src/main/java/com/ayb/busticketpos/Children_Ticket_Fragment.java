@@ -33,7 +33,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.zcs.sdk.DriverManager;
@@ -66,7 +65,7 @@ public class Children_Ticket_Fragment extends Fragment {
     private TextView     viewStage;
     private Button       btnLeft, btnRight;
     private LinearLayout fareRow1, fareRow2, fareRow3;
-    private ImageButton btn_viewAmt;
+//    private ImageButton btn_viewAmt;
     private TextView total_amount;
 
     // fare‐button state
@@ -80,12 +79,8 @@ public class Children_Ticket_Fragment extends Fragment {
 
     // printer (if needed)
     private Context       mContext;
-    private DriverManager mDriverManager;
     private Printer       mPrinter;
-    private boolean       isSupportCutter;
 
-    // at top of class, alongside your other fields:
-    private Button       btnShowTariffs, btn_print, btn_back;
     private int          selectedTariffIndex  = -1;
     private String       selectedTariffStage;
     private int          selectedTariffAmount;
@@ -105,7 +100,7 @@ public class Children_Ticket_Fragment extends Fragment {
         return f;
     }
 
-    @SuppressLint("ClickableViewAccessibility")
+    @SuppressLint({"ClickableViewAccessibility", "SetTextI18n"})
     @Nullable
     @Override
     public View onCreateView(
@@ -127,18 +122,19 @@ public class Children_Ticket_Fragment extends Fragment {
         fareRow1  = root.findViewById(R.id.fare_row1);
         fareRow2  = root.findViewById(R.id.fare_row2);
         fareRow3  = root.findViewById(R.id.fare_row3);
-        btn_print = root.findViewById(R.id.btn_print);
-        btn_back = root.findViewById(R.id.btn_menu);
-        btn_viewAmt = root.findViewById(R.id.btn_view_amount);
+        // at top of class, alongside your other fields:
+        Button btn_print = root.findViewById(R.id.btn_print);
+        Button btn_back = root.findViewById(R.id.btn_menu);
+        ImageButton btn_viewAmt = root.findViewById(R.id.btn_view_amount);
         total_amount = root.findViewById(R.id.total_amount);
+        Button btn_calculator = root.findViewById(R.id.btn_calculator);
 
         // 2️⃣ optional printer setup
         mContext       = getActivity();
-        mDriverManager = DriverManager.getInstance();
+        DriverManager mDriverManager = DriverManager.getInstance();
         mPrinter       = mDriverManager.getPrinter();
-        isSupportCutter= mPrinter.isSuppoerCutter();
 
-        btnShowTariffs = root.findViewById(R.id.btn_see_tariffs);
+        Button btnShowTariffs = root.findViewById(R.id.btn_see_tariffs);
         btnShowTariffs.setOnClickListener(v -> showTariffsDialog());
 
         // 3️⃣ colors
@@ -160,32 +156,26 @@ public class Children_Ticket_Fragment extends Fragment {
         // 4️⃣ Observe stages list
         stageVm.getStages().observe(
                 getViewLifecycleOwner(),
-                new Observer<List<StageEntity>>() {
-                    @Override
-                    public void onChanged(List<StageEntity> stages) {
-                        stageNos.clear();
-                        stageNames.clear();
-                        for (StageEntity s : stages) {
-                            stageNos.add(s.stageNo);
-                            stageNames.add(s.stageName);
-                        }
-                        computeAndShowChildTariffs();
-                        updateStageDisplay();
+                stages -> {
+                    stageNos.clear();
+                    stageNames.clear();
+                    for (StageEntity s : stages) {
+                        stageNos.add(s.stageNo);
+                        stageNames.add(s.stageName);
                     }
+                    computeAndShowChildTariffs();
+                    updateStageDisplay();
                 }
         );
 
         // 5️⃣ Observe current index
         stageVm.getCurrentIndex().observe(
                 getViewLifecycleOwner(),
-                new Observer<Integer>() {
-                    @Override
-                    public void onChanged(Integer idx) {
-                        if (idx != null) {
-                            currentStageIndex = idx;
-                            Prefs.saveCurrentStageID(requireContext(), idx);
-                            updateStageDisplay();
-                        }
+                idx -> {
+                    if (idx != null) {
+                        currentStageIndex = idx;
+                        Prefs.saveCurrentStageID(requireContext(), idx);
+                        updateStageDisplay();
                     }
                 }
         );
@@ -201,6 +191,8 @@ public class Children_Ticket_Fragment extends Fragment {
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
             getActivity().finish();
         });
+
+        btn_calculator.setOnClickListener(v -> startActivity(new Intent(mContext, Calculator.class)));
 
         btn_viewAmt.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
@@ -321,6 +313,7 @@ public class Children_Ticket_Fragment extends Fragment {
     }
 
     /** Refresh displayed stage name & arrow enable/disable */
+    @SuppressLint("SetTextI18n")
     private void updateStageDisplay() {
         if (stageNames.isEmpty()) {
             viewStage.setText("No stages");
@@ -437,8 +430,7 @@ public class Children_Ticket_Fragment extends Fragment {
 
     private @Nullable String calculateDestinationStage(
             int startIndex,
-            int fareAmount,
-            @NonNull String fareType
+            int fareAmount
     ) {
         if (allTariffRanges.isEmpty() || stageNos.isEmpty() || stageNames.isEmpty())
             return null;
@@ -446,12 +438,8 @@ public class Children_Ticket_Fragment extends Fragment {
         // 1️⃣ Find best matching range for fareType
         TariffRange bestMatch = null;
         for (TariffRange r : allTariffRanges) {
-            boolean match = false;
-            switch (fareType) {
-                case "adult":   match = r.adult == fareAmount; break;
-                case "student": match = r.student == fareAmount; break;
-                case "child":   match = r.child == fareAmount; break;
-            }
+            boolean match;
+            match = r.child == fareAmount;
             if (match) {
                 if (bestMatch == null || r.maxStages > bestMatch.maxStages) {
                     bestMatch = r;
@@ -654,7 +642,7 @@ public class Children_Ticket_Fragment extends Fragment {
 
         routeName = Prefs.getSelectedRouteName(mContext);
         String currentStage = stageNames.get(currentStageIndex);
-        String destination = calculateDestinationStage(currentStageIndex, Integer.valueOf(fareValue), "child");
+        String destination = calculateDestinationStage(currentStageIndex, Integer.valueOf(fareValue));
 
         String currentDate = new SimpleDateFormat(
                 "dd/MM/yyyy", Locale.getDefault()
@@ -1090,10 +1078,10 @@ public class Children_Ticket_Fragment extends Fragment {
     }
 
     //Shows the total amount for the current Shift
+    @SuppressLint("SetTextI18n")
     private void showTotalAmountForToday(@Nullable TextView targetView) {
         Executors.newSingleThreadExecutor().execute(() -> {
             AppDatabase db = AppDatabase.getInstance(requireContext());
-            String today = Prefs.getDayDate(requireContext());
             String busNo = Prefs.getSelectedBus(requireContext());
 
 //            final Integer[] total = {db.ticketDao().getTotalAmountForDate(today, busNo)};
