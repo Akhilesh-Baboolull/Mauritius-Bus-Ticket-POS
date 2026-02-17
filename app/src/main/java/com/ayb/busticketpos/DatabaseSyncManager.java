@@ -188,4 +188,7 @@ public class DatabaseSyncManager {
             }
         });
     }
+
+    public static boolean isSyncRunning() { return isRunning; }
+
 }

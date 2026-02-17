@@ -13,7 +13,9 @@ import androidx.work.WorkerParameters;
 
 import org.json.JSONObject;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 public class SyncWorker extends Worker {
     public SyncWorker(@NonNull Context context, @NonNull WorkerParameters params) {
@@ -22,7 +24,8 @@ public class SyncWorker extends Worker {
 
     @NonNull @Override
     public Result doWork() {
-        AppDatabase db = AppDatabase.getInstance(getApplicationContext());
+        Context ctx = getApplicationContext();
+        AppDatabase db = AppDatabase.getInstance(ctx);
         SyncJobDao dao = db.syncJobDao();
 
         List<SyncJob> batch = dao.fetchBatch(25);
@@ -32,12 +35,30 @@ public class SyncWorker extends Worker {
 
         for (SyncJob job : batch) {
             try {
-                String respStr = HttpUtil.postJson(job.endpoint, job.payloadJson);
-                JSONObject resp = new JSONObject(respStr);
-                String status = resp.optString("status", "fail");
+                String respStr;
+                if (UpdateConfig.REPORT_URL.equals(job.endpoint)) {
+                    // Update report endpoint requires X-Device-Id / X-Signature auth
+                    String machineIdStr = PrefsSecure.getMachineId(ctx);
+                    String apiKey = PrefsSecure.getApiKey(ctx);
+                    if (machineIdStr == null || machineIdStr.trim().isEmpty() || apiKey == null || apiKey.trim().isEmpty()) {
+                        anyFailed = true;
+                        dao.markFailed(job.id, "Missing provisioning for report");
+                        continue;
+                    }
+                    int deviceId = Integer.parseInt(machineIdStr.trim());
+                    byte[] bodyBytes = job.payloadJson.getBytes(StandardCharsets.UTF_8);
+                    Map<String, String> headers = UpdateAuth.buildAuthHeaders(deviceId, apiKey, bodyBytes);
+                    respStr = UpdateHttp.postJson(job.endpoint, job.payloadJson, headers);
+                } else {
+                    respStr = HttpUtil.postJson(job.endpoint, job.payloadJson);
+                }
 
-                if ("success".equalsIgnoreCase(status)) {
-                    // success → delete job
+                JSONObject resp = new JSONObject(respStr);
+                // Accept both legacy "status":"success" and report.php "ok":true
+                boolean success = "success".equalsIgnoreCase(resp.optString("status", ""))
+                        || resp.optBoolean("ok", false);
+
+                if (success) {
                     dao.deleteById(job.id);
                 } else {
                     anyFailed = true;

@@ -56,6 +56,15 @@ public class PrefsSecure {
         return getSecurePrefs(context).getString("MACHINE_ID", "");
     }
 
+    public static void saveFeedbackNumber(Context context, String phone_number) {
+        getSecurePrefs(context).edit().putString("PHONE_NUMBER", phone_number).apply();
+    }
+
+    // 🔓 Retrieve
+    public static String getFeedbackNumber(Context context) {
+        return getSecurePrefs(context).getString("PHONE_NUMBER", "");
+    }
+
     public static String getTenantName(Context context) {
         try {
             if (context == null) return "AYB WAY";
@@ -75,5 +84,18 @@ public class PrefsSecure {
             return "AYB WAY";
         }
     }
+
+    public static void saveApiKey(Context context, String apiKey) {
+        getSecurePrefs(context).edit().putString("API_KEY", apiKey).apply();
+    }
+
+    public static String getApiKey(Context context) {
+        return getSecurePrefs(context).getString("API_KEY", "");
+    }
+
+    public static boolean hasProvisioning(Context ctx) {
+        return !getTenantId(ctx).isEmpty() && !getMachineId(ctx).isEmpty() && !getApiKey(ctx).isEmpty();
+    }
+
 
 }

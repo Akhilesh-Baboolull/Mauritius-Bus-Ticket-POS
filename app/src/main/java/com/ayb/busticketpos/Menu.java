@@ -32,12 +32,15 @@ import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.Observer;
+
+import org.json.JSONObject;
 
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
@@ -60,7 +63,7 @@ public class Menu extends AppCompatActivity {
     ProgressBar progressBar;
     TextView debugSecret;
     Button btn_start_trip, btn_update, btn_admin_close;
-    EditText admin_password, userId, machineId, newTenantName;
+    EditText admin_password, userId, machineId;
     TextView tenant_name;
     ImageView aybway_logo;
     TextView kioskMode;
@@ -76,12 +79,18 @@ public class Menu extends AppCompatActivity {
     private Handler bootDelayHandler;
     final boolean[] isSyncTriggered = {false};
 
-    @SuppressLint({"MissingInflatedId", "WrongViewCast"})
+    @SuppressLint({"MissingInflatedId", "WrongViewCast", "SetTextI18n"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_menu);
+
+        // Kiosk: show over lock screen and turn screen on when launched (e.g. after update relaunch)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+        }
 
         long lastAlive = Prefs.getLastAlive(this);
         long now = System.currentTimeMillis();
@@ -190,8 +199,6 @@ public class Menu extends AppCompatActivity {
         battery_icon = findViewById(R.id.battery_icon);
         clock_view = findViewById(R.id.clock_view);
         tenant_name = findViewById(R.id.tenant_name);
-        newTenantName = findViewById(R.id.tenantName);
-
         tenant_name.setText(PrefsSecure.getTenantName(this));
 
 
@@ -393,8 +400,7 @@ public class Menu extends AppCompatActivity {
             public void run() {
                 // Only update if screen is on to save battery
                 android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
-                boolean screenOn = pm == null || (android.os.Build.VERSION.SDK_INT >= 20
-                        ? pm.isInteractive() : pm.isScreenOn());
+                boolean screenOn = pm == null || pm.isInteractive();
                 if (screenOn) {
                     clock_view.setText(clockFormat.format(new java.util.Date()));
                 }
@@ -468,14 +474,12 @@ public class Menu extends AppCompatActivity {
                     );
 
                     // Step 2 — Background (Android 10+)
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                        dpm.setPermissionGrantState(
-                                admin,
-                                getPackageName(),
-                                android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-                                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
-                        );
-                    }
+                    dpm.setPermissionGrantState(
+                            admin,
+                            getPackageName(),
+                            android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+                    );
 
                     // Step 3 — Foreground service permission (Android 14+)
                     if (android.os.Build.VERSION.SDK_INT >= 34) {
@@ -522,6 +526,7 @@ public class Menu extends AppCompatActivity {
 
 
 
+    @SuppressLint("ClickableViewAccessibility")
     private void blockStatusBarPullDown() {
         try {
             // Prevent duplicate overlays
@@ -738,8 +743,8 @@ public class Menu extends AppCompatActivity {
                             0,                                // start
                             msg.length(),                     // end
                             Spannable.SPAN_INCLUSIVE_INCLUSIVE
-                    );
-                    sizedMsg.setSpan(
+                     );
+                   sizedMsg.setSpan(
                             new AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER),
                             0, msg.length(),
                             Spanned.SPAN_INCLUSIVE_INCLUSIVE
@@ -797,10 +802,7 @@ public class Menu extends AppCompatActivity {
                     dialog.getWindow().setBackgroundDrawable(
                             new ColorDrawable(Color.parseColor("#FFAA00"))
                     );
-
-
                 }
-
             }
         });
 
@@ -826,7 +828,6 @@ public class Menu extends AppCompatActivity {
             String pwd = admin_password.getText().toString().trim();
             String tenantId = userId.getText().toString().trim();
             String machine = machineId.getText().toString().trim();
-            String tenantName = newTenantName.getText().toString().trim();
 
             if (!pwd.equals("AYB%0000")) {
                 Toast.makeText(Menu.this, "Unauthorised Access!", Toast.LENGTH_SHORT).show();
@@ -838,15 +839,55 @@ public class Menu extends AppCompatActivity {
                 return;
             }
 
-            PrefsSecure.saveTenantId(Menu.this, tenantId);
-            PrefsSecure.saveMachineId(Menu.this, machine);
-            PrefsSecure.saveTenantName(Menu.this, tenantName);
+            int tenantIdInt;
+            int machineIdInt;
+            try {
+                tenantIdInt = Integer.parseInt(tenantId);
+                machineIdInt = Integer.parseInt(machine);
+            } catch (NumberFormatException e) {
+                Toast.makeText(Menu.this, "Invalid Tenant ID or Machine ID.", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            Toast.makeText(Menu.this, "Machine updated securely!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(Menu.this, "Registering...", Toast.LENGTH_SHORT).show();
 
-            tenant_name.setText(PrefsSecure.getTenantName(this));
+            Executors.newSingleThreadExecutor().execute(() -> {
+                try {
+                    JSONObject body = new JSONObject();
+                    body.put("tenant_id", tenantIdInt);
+                    body.put("machine_id", machineIdInt);
+                    String resp = HttpUtil.postJson(UpdateConfig.PROVISION_URL, body.toString());
+                    JSONObject j = new JSONObject(resp);
 
-            admin_layout.setVisibility(View.GONE);
+                    if (j.optBoolean("success", false)) {
+                        String tn = j.optString("tenant_name", "");
+                        String pn = j.optString("phone_number", "");
+                        String ak = j.optString("api_key", "");
+                        runOnUiThread(() -> {
+                            PrefsSecure.saveTenantId(Menu.this, tenantId);
+                            PrefsSecure.saveMachineId(Menu.this, machine);
+                            PrefsSecure.saveTenantName(Menu.this, tn);
+                            PrefsSecure.saveFeedbackNumber(Menu.this, pn);
+                            PrefsSecure.saveApiKey(Menu.this, ak);
+                            tenant_name.setText(PrefsSecure.getTenantName(Menu.this));
+                            admin_layout.setVisibility(View.GONE);
+                            Toast.makeText(Menu.this,
+                                    "Registered successfully. Tenant: " + tn + ", Phone: " + pn,
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    } else {
+                        String err = j.optString("error", "Unknown error");
+                        runOnUiThread(() -> Toast.makeText(Menu.this,
+                                "Registration failed: " + err,
+                                Toast.LENGTH_LONG).show());
+                    }
+                } catch (Exception e) {
+                    final String displayMsg = getString(e);
+                    runOnUiThread(() -> Toast.makeText(Menu.this,
+                            "Registration failed: " + displayMsg,
+                            Toast.LENGTH_LONG).show());
+                }
+            });
         });
 
         btn_admin_mode_ok.setOnClickListener(v -> {
@@ -1041,6 +1082,26 @@ public class Menu extends AppCompatActivity {
             }
         });
 
+    }
+
+    @Nullable
+    private static String getString(Exception e) {
+        String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+        // If server returned JSON with "error", show that (e.g. "POST failed: HTTP 403 body={...}")
+        if (msg != null && msg.contains("body=")) {
+            int i = msg.indexOf("body=");
+            if (i >= 0) {
+                try {
+                    String bodyPart = msg.substring(i + 5).trim();
+                    JSONObject errJson = new JSONObject(bodyPart);
+                    if (errJson.has("error")) {
+                        msg = errJson.optString("error", msg);
+                    }
+                } catch (Exception ignored) { }
+            }
+        }
+        final String displayMsg = msg;
+        return displayMsg;
     }
 
 }

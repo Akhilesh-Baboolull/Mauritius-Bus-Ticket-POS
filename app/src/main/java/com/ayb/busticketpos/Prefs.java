@@ -30,6 +30,10 @@ public class Prefs {
     private static final String KEY_CUSTOM_TRIP_REPORT_COUNT = "custom_trip_report_count";
     private static final String KEY_SUMMARY_REPORT_COUNT = "summary_report_count";
     private static final String KEY_HEARTBEAT = "heartbeat";
+    /** Set by UpdateWorker before install; cleared in App.onCreate to run DB sync after update relaunch. */
+    private static final String KEY_RUN_DB_SYNC_ON_NEXT_LAUNCH = "run_db_sync_on_next_launch";
+    /** Set on install success; UnlockReceiver brings app to front on USER_PRESENT and clears this. */
+    private static final String KEY_PENDING_RELAUNCH_AFTER_UNLOCK = "pending_relaunch_after_unlock";
 
     public static void setLastAlive(Context ctx, long millis) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -311,5 +315,36 @@ public class Prefs {
                 .commit();
     }
 
+    /** Set when an update is being installed so the relaunched app runs DB sync once. */
+    public static void setRunDbSyncOnNextLaunch(Context ctx, boolean run) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_RUN_DB_SYNC_ON_NEXT_LAUNCH, run)
+                .apply();
+    }
+
+    /** Returns true if DB sync was requested for next launch, and clears the flag. */
+    public static boolean getAndClearRunDbSyncOnNextLaunch(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        boolean value = prefs.getBoolean(KEY_RUN_DB_SYNC_ON_NEXT_LAUNCH, false);
+        if (value) prefs.edit().putBoolean(KEY_RUN_DB_SYNC_ON_NEXT_LAUNCH, false).apply();
+        return value;
+    }
+
+    /** Set when an update install succeeded so we bring the app to front on next unlock. Uses commit() so it persists before process may be killed. */
+    public static void setPendingRelaunchAfterUnlock(Context ctx, boolean pending) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_PENDING_RELAUNCH_AFTER_UNLOCK, pending)
+                .commit();
+    }
+
+    /** Returns true if we should bring app to front after unlock (post-update), and clears the flag. */
+    public static boolean getAndClearPendingRelaunchAfterUnlock(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        boolean value = prefs.getBoolean(KEY_PENDING_RELAUNCH_AFTER_UNLOCK, false);
+        if (value) prefs.edit().putBoolean(KEY_PENDING_RELAUNCH_AFTER_UNLOCK, false).apply();
+        return value;
+    }
 
 }

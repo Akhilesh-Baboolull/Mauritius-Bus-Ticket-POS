@@ -10,10 +10,9 @@ public class FetchReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         Log.i("FetchReceiver", "Daily fetch triggered");
-        try {
-            AppDatabase.forceRefresh(context);
-        } catch (Exception e) {
-            Log.e("FetchReceiver", "Error during daily DB fetch", e);
-        }
+        // Update first (check → install → relaunch); DB sync runs after update flow (see UpdateWorker / App)
+        UpdateScheduler.enqueueDailyUpdate(context);
+        // Reschedule next day — exact alarm is one-shot, so we set it again after each run
+        App.scheduleDailyFetch(context);
     }
 }

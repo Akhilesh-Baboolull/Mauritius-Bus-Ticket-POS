@@ -18,7 +18,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".App"
@@ -35,6 +35,15 @@
         <activity
             android:name=".Calculator"
             android:exported="false" />
+
+        <receiver
+            android:name=".FetchReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".InstallResultReceiver"
+            android:exported="false" />
+
         <!-- ========================================================= -->
         <!-- 1) SERVICES MOVED TO BACKGROUND PROCESS (:bg) -->
         <!-- ========================================================= -->

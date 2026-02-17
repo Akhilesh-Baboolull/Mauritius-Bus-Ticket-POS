@@ -125,13 +125,20 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
             long now = System.currentTimeMillis();
             long ttl = days * 24L * 60L * 60L * 1000L;
 
-            File[] files = logDir.listFiles((dir, name) ->
+            File[] crashFiles = logDir.listFiles((dir, name) ->
                     name != null && name.startsWith("crashlog-") && name.endsWith(".txt"));
-            if (files == null) return;
-
             int deleted = 0;
-            for (File f : files) {
-                if (now - f.lastModified() > ttl && f.delete()) deleted++;
+            if (crashFiles != null) {
+                for (File f : crashFiles) {
+                    if (now - f.lastModified() > ttl && f.delete()) deleted++;
+                }
+            }
+            File[] updateFiles = logDir.listFiles((dir, name) ->
+                    name != null && name.startsWith("updatelog-") && name.endsWith(".txt"));
+            if (updateFiles != null) {
+                for (File f : updateFiles) {
+                    if (now - f.lastModified() > ttl && f.delete()) deleted++;
+                }
             }
             if (deleted > 0) {
                 Log.i(TAG, "Cleanup: deleted " + deleted + " old log file(s)");
@@ -143,5 +150,69 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
 
     public static File getTodayLogFile() {
         return (instance != null) ? instance.getDailyLogFile() : null;
+    }
+
+    // --- Update / self-update log (separate file for investigating update/relaunch issues) ---
+
+    private File getUpdateLogFile() {
+        File docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
+        File logDir = new File(docsDir, "BusTicketPOSLogs");
+        if (!logDir.exists()) logDir.mkdirs();
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        return new File(logDir, "updatelog-" + today + ".txt");
+    }
+
+    /**
+     * Log an update-related event or failure to a separate file (updatelog-YYYY-MM-DD.txt)
+     * for later investigation. Non-blocking.
+     */
+    public static void logUpdateEvent(String tag, String message) {
+        if (instance != null) {
+            instance.writeUpdateLog(tag, message, null);
+        } else {
+            Log.e(tag, "CrashLogger not initialized. Update event: " + message);
+        }
+    }
+
+    /**
+     * Log an update-related error with optional throwable to updatelog-YYYY-MM-DD.txt.
+     */
+    public static void logUpdateEvent(String tag, String message, Throwable t) {
+        if (instance != null) {
+            instance.writeUpdateLog(tag, message, t);
+        } else {
+            Log.e(tag, "CrashLogger not initialized. Update event: " + message, t);
+        }
+    }
+
+    private synchronized void writeUpdateLog(String tag, String message, Throwable t) {
+        logExecutor.execute(() -> {
+            try {
+                Runtime rt = Runtime.getRuntime();
+                if ((float) rt.freeMemory() / rt.totalMemory() < 0.05f) {
+                    Log.w(TAG, "Skipping update log write: low memory");
+                    return;
+                }
+                File logFile = getUpdateLogFile();
+                try (FileWriter fw = new FileWriter(logFile, true);
+                     PrintWriter pw = new PrintWriter(fw)) {
+                    String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
+                    pw.println("===== " + ts + " =====");
+                    pw.println("Tag: " + tag);
+                    pw.println("Message: " + message);
+                    if (t != null) {
+                        pw.println("Exception: " + t.getMessage());
+                        t.printStackTrace(pw);
+                    }
+                    pw.println();
+                    pw.flush();
+                    Log.i(TAG, "Update event logged to " + logFile.getAbsolutePath());
+                } catch (Exception ex) {
+                    Log.e(TAG, "Failed to write update log", ex);
+                }
+            } catch (Throwable th) {
+                Log.e(TAG, "Update logger internal failure", th);
+            }
+        });
     }
 }
