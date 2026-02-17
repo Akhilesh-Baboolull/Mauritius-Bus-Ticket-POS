@@ -779,7 +779,7 @@ public class Adult_Ticket_Fragment extends Fragment {
         fmt.setTextSize(24);
         fmt.setAli(Layout.Alignment.ALIGN_CENTER);
         fmt.setFont(PrnTextFont.SANS_SERIF);
-        mPrinter.setPrintAppendString(" * Feedback on 57753049 * ", fmt);
+        mPrinter.setPrintAppendString(" * Feedback on " + PrefsSecure.getFeedbackNumber(getContext())  + " * ", fmt);
 
         //Spacer
         mPrinter.setPrintAppendString("", fmt);
@@ -1073,7 +1073,7 @@ public class Adult_Ticket_Fragment extends Fragment {
         fmt.setTextSize(24);
         fmt.setAli(Layout.Alignment.ALIGN_CENTER);
         fmt.setFont(PrnTextFont.SANS_SERIF);
-        mPrinter.setPrintAppendString(" * Feedback on 57753049 * ", fmt);
+        mPrinter.setPrintAppendString(" * Feedback on " + PrefsSecure.getFeedbackNumber(getContext())  + " * ", fmt);
 
         //Spacer
         mPrinter.setPrintAppendString("", fmt);
