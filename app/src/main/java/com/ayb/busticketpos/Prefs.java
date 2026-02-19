@@ -34,6 +34,8 @@ public class Prefs {
     private static final String KEY_RUN_DB_SYNC_ON_NEXT_LAUNCH = "run_db_sync_on_next_launch";
     /** Set on install success; UnlockReceiver brings app to front on USER_PRESENT and clears this. */
     private static final String KEY_PENDING_RELAUNCH_AFTER_UNLOCK = "pending_relaunch_after_unlock";
+    /** One-time: after cancelAllWork() to clear job flood on device-owner devices where Clear data is greyed out. */
+    private static final String KEY_WORKMANAGER_FLOOD_CLEANED_V1 = "workmanager_flood_cleaned_v1";
 
     public static void setLastAlive(Context ctx, long millis) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -329,6 +331,18 @@ public class Prefs {
         boolean value = prefs.getBoolean(KEY_RUN_DB_SYNC_ON_NEXT_LAUNCH, false);
         if (value) prefs.edit().putBoolean(KEY_RUN_DB_SYNC_ON_NEXT_LAUNCH, false).apply();
         return value;
+    }
+
+    public static boolean getWorkManagerFloodCleaned(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_WORKMANAGER_FLOOD_CLEANED_V1, false);
+    }
+
+    public static void setWorkManagerFloodCleaned(Context ctx, boolean done) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_WORKMANAGER_FLOOD_CLEANED_V1, done)
+                .apply();
     }
 
     /** Set when an update install succeeded so we bring the app to front on next unlock. Uses commit() so it persists before process may be killed. */

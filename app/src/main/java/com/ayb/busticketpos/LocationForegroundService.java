@@ -9,7 +9,9 @@ import android.content.Intent;
 import android.location.Location;
 import android.os.BatteryManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -94,47 +96,60 @@ public class LocationForegroundService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-
+        // Call startForeground() immediately so we satisfy the timeout when :bg process cold-starts.
         ensureChannel();
         startForeground(NOTIF_ID, buildNotif("Tracking enabled"));
+        Log.i(TAG, "Foreground notification posted; deferring location client init");
 
-        fused = LocationServices.getFusedLocationProviderClient(this);
+        // Defer the rest so onCreate() returns quickly; avoids ForegroundServiceDidNotStartInTimeException.
+        new Handler(Looper.getMainLooper()).post(() -> {
+            Log.d(TAG, "Deferred init: creating FusedLocationProviderClient and applying mode");
+            fused = LocationServices.getFusedLocationProviderClient(this);
+            callback = new LocationCallback() {
+                @Override
+                public void onLocationResult(@NonNull LocationResult locationResult) {
+                    Location loc = locationResult.getLastLocation();
+                    if (loc == null) return;
 
-        callback = new LocationCallback() {
-            @Override
-            public void onLocationResult(@NonNull LocationResult locationResult) {
-                Location loc = locationResult.getLastLocation();
-                if (loc == null) return;
+                    // Normal periodic sends: cached state is ok (stable payload).
+                    postLocation(loc, false);
 
-                // Normal periodic sends: cached state is ok (stable payload).
-                postLocation(loc, false);
-
-                // Update mode if DB day status changed.
-                applyModeFromDbIfNeeded(false);
-            }
-        };
-
-        // Apply mode once at startup.
-        applyModeFromDbIfNeeded(true);
+                    // Update mode if DB day status changed.
+                    applyModeFromDbIfNeeded(false);
+                }
+            };
+            applyModeFromDbIfNeeded(true);
+        });
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Ensure we're in foreground (covers late process start or retries).
+        try {
+            startForeground(NOTIF_ID, buildNotif("Tracking enabled"));
+            Log.d(TAG, "onStartCommand: foreground notification ensured");
+        } catch (Exception e) {
+            Log.w(TAG, "onStartCommand: startForeground failed", e);
+        }
 
-        if (intent != null) {
+        // Handle action only when present (first start often has null intent/action).
+        if (intent != null && intent.getAction() != null) {
             String action = intent.getAction();
 
             if (ACTION_STOP.equals(action)) {
+                Log.i(TAG, "onStartCommand: ACTION_STOP — stopping service");
                 stopSelfSafely();
                 return START_NOT_STICKY;
             }
 
             if (ACTION_SEND_NOW.equals(action)) {
+                Log.d(TAG, "onStartCommand: ACTION_SEND_NOW — force refresh and send once");
                 // Force refresh state (don’t use cached payload)
                 sendImmediateOnce(true);
             }
 
             if (ACTION_SEND_DAY_END.equals(action)) {
+                Log.d(TAG, "onStartCommand: ACTION_SEND_DAY_END — force refresh (day ended)");
                 // Day just ended: force refresh so busNo/tripNo/route are nulled correctly.
                 sendImmediateOnce(true);
             }
@@ -163,6 +178,7 @@ public class LocationForegroundService extends Service {
 
     private void applyModeFromDbIfNeeded(boolean force) {
         io.execute(() -> {
+            if (fused == null || callback == null) return; // Deferred init not done yet
             boolean dayActive = BgStateRepo.isDayActive(getApplicationContext());
 
             // Mode changes = invalidate cached payload so it updates quickly
@@ -207,6 +223,7 @@ public class LocationForegroundService extends Service {
     // ---------------------------------------------------------------------
 
     private void sendImmediateOnce(boolean forceRefreshState) {
+        if (fused == null) return; // Deferred init not done yet
         try {
             CancellationTokenSource cts = new CancellationTokenSource();
             fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.getToken())

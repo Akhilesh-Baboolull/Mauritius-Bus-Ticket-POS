@@ -12,6 +12,8 @@ import android.util.Log;
 
 import org.json.JSONObject;
 
+import java.util.concurrent.Executors;
+
 public class InstallResultReceiver extends BroadcastReceiver {
     private static final String TAG = "InstallResultReceiver";
     /** Delay before relaunching so the package is unfrozen after install (avoids SecurityException). */
@@ -38,7 +40,9 @@ public class InstallResultReceiver extends BroadcastReceiver {
             if (status == PackageInstaller.STATUS_SUCCESS) {
                 r.put("event", "INSTALL_SUCCESS");
                 Log.i(TAG, "Install success");
-                SyncQueueUtil.enqueue(context, UpdateConfig.REPORT_URL, r, msg);
+                enqueueOnBackground(context, r, msg);
+                Executors.newSingleThreadExecutor().execute(() ->
+                        CrashLogger.logUpdateEvent(TAG, "INSTALL_SUCCESS"));
 
                 Context appContext = context.getApplicationContext();
                 Prefs.setPendingRelaunchAfterUnlock(appContext, true);
@@ -47,17 +51,32 @@ public class InstallResultReceiver extends BroadcastReceiver {
                 // 2) Fallback: one-shot alarm to open app in 5s (in case this process is killed before the Handler runs)
                 scheduleRelaunchAlarm(appContext);
             } else {
+                // status=1 (STATUS_FAILURE) with empty message can occur on first attempt; retry may succeed (e.g. BTM04).
                 r.put("event", "INSTALL_FAILED");
                 r.put("errorCode", status);
                 if (msg != null) r.put("message", msg);
                 Log.e(TAG, "Install failed status=" + status + " msg=" + msg);
-                SyncQueueUtil.enqueue(context, UpdateConfig.REPORT_URL, r, msg);
-                CrashLogger.logUpdateEvent(TAG, "INSTALL_FAILED status=" + status + " message=" + (msg != null ? msg : ""));
+                final String crashMsg = "INSTALL_FAILED status=" + status + " message=" + (msg != null ? msg : "");
+                enqueueOnBackground(context, r, msg);
+                Executors.newSingleThreadExecutor().execute(() ->
+                        CrashLogger.logUpdateEvent(TAG, crashMsg));
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to report install result", e);
             CrashLogger.logUpdateEvent(TAG, "Failed to report install result", e);
         }
+    }
+
+    /** Room DB insert must not run on main thread (BroadcastReceiver). */
+    private static void enqueueOnBackground(Context context, JSONObject r, String msg) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                SyncQueueUtil.enqueue(context, UpdateConfig.REPORT_URL, r, msg);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to report install result", e);
+                CrashLogger.logUpdateEvent(TAG, "Failed to report install result", e);
+            }
+        });
     }
 
     /**

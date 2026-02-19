@@ -1,6 +1,8 @@
 package com.ayb.busticketpos;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.os.BatteryManager;
 import android.util.Log;
@@ -162,14 +164,30 @@ public class UpdateWorker extends Worker {
         return false;
     }
 
+    /**
+     * Use the same battery source as the UI (sticky ACTION_BATTERY_CHANGED) so the reported
+     * value matches what the user sees (e.g. 98%). BatteryManager.getIntProperty can be stale
+     * or wrong on some devices when the worker runs.
+     */
     private static int getBatteryPercent(Context ctx) {
         try {
+            Intent batt = ctx.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (batt != null) {
+                int level = batt.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int scale = batt.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                if (level >= 0 && scale > 0) {
+                    return (int) ((level / (float) scale) * 100);
+                }
+            }
             BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
-            if (bm == null) return -1;
-            return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+            if (bm != null) {
+                int cap = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+                if (cap >= 0 && cap <= 100) return cap;
+            }
         } catch (Exception e) {
-            return -1;
+            // ignore
         }
+        return -1;
     }
 
     private static int getCurrentVersionCode(Context ctx) {

@@ -92,6 +92,9 @@ public class Menu extends AppCompatActivity {
             setTurnScreenOn(true);
         }
 
+        // Safety net: ensure daily update alarm is scheduled whenever the launcher is opened (covers first boot / reset on POS 4 where App main process might not have run yet).
+        App.scheduleDailyFetch(this);
+
         long lastAlive = Prefs.getLastAlive(this);
         long now = System.currentTimeMillis();
 

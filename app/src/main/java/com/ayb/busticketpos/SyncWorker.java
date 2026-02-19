@@ -5,6 +5,7 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.work.Constraints;
+import androidx.work.ExistingWorkPolicy;
 import androidx.work.NetworkType;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
@@ -70,13 +71,17 @@ public class SyncWorker extends Worker {
             }
         }
 
-        // If items remain, schedule another attempt
+        // If items remain, schedule one more drain (same unique name so we don't spawn hundreds of works and thrash GreedyScheduler).
         if (dao.count() > 0) {
             OneTimeWorkRequest req = new OneTimeWorkRequest.Builder(SyncWorker.class)
                     .setInitialDelay(20, java.util.concurrent.TimeUnit.SECONDS)
                     .setConstraints(new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                     .build();
-            WorkManager.getInstance(getApplicationContext()).enqueue(req);
+            WorkManager.getInstance(getApplicationContext()).enqueueUniqueWork(
+                    "sync-drain",
+                    ExistingWorkPolicy.REPLACE,
+                    req
+            );
         }
 
         return anyFailed ? Result.retry() : Result.success();
