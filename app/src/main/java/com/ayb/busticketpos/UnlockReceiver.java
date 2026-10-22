@@ -13,9 +13,9 @@ public class UnlockReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (Intent.ACTION_USER_PRESENT.equals(intent.getAction())) {
-            // After an update install, system often shows Settings on top. Run after a short delay
-            // so we execute after the unlock transition, then launch our app as "Home" (default launcher).
+        try {
+            if (intent == null || !Intent.ACTION_USER_PRESENT.equals(intent.getAction())) return;
+
             if (Prefs.getAndClearPendingRelaunchAfterUnlock(context)) {
                 Context app = context.getApplicationContext();
                 Handler h = new Handler(Looper.getMainLooper());
@@ -36,8 +36,13 @@ public class UnlockReceiver extends BroadcastReceiver {
                     }
                 }, POST_UNLOCK_DELAY_MS);
             }
-            Log.d("UnlockReceiver", "User unlocked device — restarting LocationForegroundService");
-            LocationForegroundService.startIfNeeded(context);
+            try {
+                LocationForegroundService.startIfNeeded(context);
+            } catch (Exception e) {
+                Log.e("UnlockReceiver", "LocationForegroundService start failed", e);
+            }
+        } catch (Exception e) {
+            Log.e("UnlockReceiver", "onReceive failed", e);
         }
     }
 }

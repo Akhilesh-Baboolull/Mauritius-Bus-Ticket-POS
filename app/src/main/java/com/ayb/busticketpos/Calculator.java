@@ -39,7 +39,7 @@ public class Calculator extends AppCompatActivity {
     private ChipGroup chipsSelected;
     private RecyclerView rvLastTickets;
 
-    private Button btnQuick50, btnQuick100, btnQuick200, btnQuick500, btnBack, btnClear;
+    private Button btnQuick100, btnQuick200, btnQuick250, btnQuick500, btnBack, btnClear;
 
     private TicketDao ticketDao;
 
@@ -113,9 +113,9 @@ public class Calculator extends AppCompatActivity {
         chipsSelected = findViewById(R.id.chips_selected);
         rvLastTickets = findViewById(R.id.rv_last_tickets);
 
-        btnQuick50 = findViewById(R.id.quick_50);
         btnQuick100 = findViewById(R.id.quick_100);
         btnQuick200 = findViewById(R.id.quick_200);
+        btnQuick250 = findViewById(R.id.quick_250);
         btnQuick500 = findViewById(R.id.quick_500);
 
         btnClear = findViewById(R.id.btn_clear);
@@ -132,9 +132,9 @@ public class Calculator extends AppCompatActivity {
     private void setupQuickCash() {
         View.OnClickListener l = v -> {
             int amount = 0;
-            if (v.getId() == R.id.quick_50) amount = 50;
-            else if (v.getId() == R.id.quick_100) amount = 100;
+            if (v.getId() == R.id.quick_100) amount = 100;
             else if (v.getId() == R.id.quick_200) amount = 200;
+            else if (v.getId() == R.id.quick_250) amount = 250;
             else if (v.getId() == R.id.quick_500) amount = 500;
 
             etMoneyReceived.setText(String.valueOf(amount));
@@ -142,9 +142,9 @@ public class Calculator extends AppCompatActivity {
             recalcAndRender();
         };
 
-        btnQuick50.setOnClickListener(l);
         btnQuick100.setOnClickListener(l);
         btnQuick200.setOnClickListener(l);
+        btnQuick250.setOnClickListener(l);
         btnQuick500.setOnClickListener(l);
     }
 
@@ -347,11 +347,13 @@ public class Calculator extends AppCompatActivity {
             this.click = click;
         }
 
+        @SuppressLint("NotifyDataSetChanged")
         void setData(List<TicketEntity> data) {
             this.data = data == null ? new ArrayList<>() : data;
             notifyDataSetChanged();
         }
 
+        @SuppressLint("NotifyDataSetChanged")
         void setSelectedIds(Set<Integer> ids) {
             this.selectedIds = (ids == null) ? new HashSet<>() : ids;
             notifyDataSetChanged();

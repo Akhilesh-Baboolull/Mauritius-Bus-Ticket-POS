@@ -60,13 +60,15 @@ public final class MemoryWatchdog {
                         if (mb >= WARNING_MB && mb < CRITICAL_MB) {
                             if (!warnedOnce) {
                                 warnedOnce = true;
-                                Log.w(TAG, "High RAM usage: " + mb + " MB");
+                                Log.w(TAG, "High RAM usage: " + mb + " MB — trimming sync queue");
+                                SyncQueueMaintenance.pruneAggressive(appCtx);
                             }
                             continue;
                         }
 
                         // CRITICAL → restart service silently
-                        Log.e(TAG, "CRITICAL RAM USAGE: " + mb + " MB — restarting service");
+                        Log.e(TAG, "CRITICAL RAM USAGE: " + mb + " MB — trimming queue + restarting service");
+                        SyncQueueMaintenance.pruneAggressive(appCtx);
 
                         restartLocationService();
 

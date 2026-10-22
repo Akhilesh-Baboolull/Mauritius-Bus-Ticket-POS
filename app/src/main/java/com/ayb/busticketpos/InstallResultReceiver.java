@@ -71,7 +71,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
     private static void enqueueOnBackground(Context context, JSONObject r, String msg) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                SyncQueueUtil.enqueue(context, UpdateConfig.REPORT_URL, r, msg);
+                SyncQueueUtil.enqueue(context, ApiEndpoints.REPORT_URL, r, msg);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to report install result", e);
                 CrashLogger.logUpdateEvent(TAG, "Failed to report install result", e);
@@ -123,7 +123,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
      * Public so UnlockReceiver can use it on USER_PRESENT to bring app to front after unlock.
      */
     public static Intent buildRelaunchIntent(Context context) {
-        Intent launch = new Intent(context, Menu.class);
+        Intent launch = new Intent(context, LockFirstActivity.class);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP
                 | Intent.FLAG_ACTIVITY_SINGLE_TOP

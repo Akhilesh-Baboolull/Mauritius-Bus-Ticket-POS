@@ -3,7 +3,14 @@ package com.ayb.busticketpos;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import androidx.annotation.Nullable;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+
+/** App preferences (file: app_prefs). PrefsCache = cache_prefs; PrefsSecure = secure/device. */
 public class Prefs {
     private static final String PREFS_NAME = "app_prefs";
     private static final String KEY_SELECTED_ROUTE = "selected_route";
@@ -36,6 +43,29 @@ public class Prefs {
     private static final String KEY_PENDING_RELAUNCH_AFTER_UNLOCK = "pending_relaunch_after_unlock";
     /** One-time: after cancelAllWork() to clear job flood on device-owner devices where Clear data is greyed out. */
     private static final String KEY_WORKMANAGER_FLOOD_CLEANED_V1 = "workmanager_flood_cleaned_v1";
+    /** Set before install so PackageReplacedReceiver can report INSTALL_SUCCESS (releaseId, fromV, toV). */
+    private static final String KEY_PENDING_INSTALL_REPORT = "pending_install_report";
+    private static final String KEY_PENDING_INSTALL_RELEASE_ID = "pending_install_release_id";
+    private static final String KEY_PENDING_INSTALL_FROM_V = "pending_install_from_v";
+    private static final String KEY_PENDING_INSTALL_TO_V = "pending_install_to_v";
+    /** Reset on boot; LockFirstActivity shows loading UI only when this is false, then sets true (once per boot). */
+    private static final String KEY_LOCK_FIRST_SHOWN_THIS_BOOT = "lock_first_shown_this_boot";
+    /** When UpdateWorker last completed an update check (any outcome). Used for launch fallback: if > 20h ago, enqueue check. */
+    private static final String KEY_LAST_UPDATE_CHECK_AT = "last_update_check_at";
+    private static final String KEY_SYNC_QUEUE_DAY_PURGE = "sync_queue_day_purge";
+
+    private static final String KEY_UPDATE_AVAILABLE = "update_available";
+    private static final String KEY_UPDATE_AVAILABLE_VERSION_CODE = "update_available_version_code";
+    private static final String KEY_UPDATE_AVAILABLE_VERSION_NAME = "update_available_version_name";
+    private static final String KEY_LAST_UPDATE_RESULT = "last_update_result";
+    private static final String KEY_LAST_NIGHTLY_UPDATE_RUN_AT = "last_nightly_update_run_at";
+    private static final String KEY_LAST_UPLOAD_SUCCESS_AT = "last_upload_success_at";
+    private static final String KEY_SETTINGS_FAILED_LOGINS = "settings_failed_logins";
+    private static final String KEY_SETTINGS_LOCKED_UNTIL = "settings_locked_until";
+
+    /** Cross-process flag for :bg location (SharedPreferences are not reliable across processes). */
+    private static final String POSITIONING_DAY_ACTIVE_FILE = "positioning_day_active";
+    private static final String POSITIONING_DAY_DATE_FILE = "positioning_day_date";
 
     public static void setLastAlive(Context ctx, long millis) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -148,6 +178,9 @@ public class Prefs {
         prefs.edit().putString(KEY_DAY_END_TIME, "").commit();
 
         initReportCount(ctx);
+        if (day_status == 1) {
+            publishPositioningDayState(ctx, true, date);
+        }
     }
 
     public static String getDayDate(Context ctx){
@@ -169,12 +202,69 @@ public class Prefs {
                 .remove(KEY_TRIP_COUNT)
                 .remove(KEY_TICKET_COUNT)
                 .remove(KEY_DAY_DATE)
+                .remove(KEY_SELECTED_BUS)
                 .remove(KEY_SELECTED_ROUTE)
+                .remove(KEY_SELECTED_ROUTE_NAME)
                 .remove(KEY_ROUTE_DIRECTION)
+                .remove(KEY_SELECTED_DIRECTION_NAME)
                 .remove(KEY_CURRENT_STAGE_ID)
                 .remove(KEY_SERVER_CURRENT_DAY_ID)
                 .remove(KEY_SERVER_CURRENT_TRIP_ID)
                 .commit();
+        publishPositioningDayState(ctx, false, null);
+    }
+
+    /**
+     * Written on the main process when day starts/ends; read by {@code :bg} for interval positioning.
+     */
+    public static void publishPositioningDayState(Context ctx, boolean dayStarted, @Nullable String dayDateDdMmYy) {
+        Context app = ctx.getApplicationContext();
+        try {
+            try (FileOutputStream fos = app.openFileOutput(POSITIONING_DAY_ACTIVE_FILE, Context.MODE_PRIVATE)) {
+                fos.write(dayStarted ? "1".getBytes(StandardCharsets.UTF_8) : "0".getBytes(StandardCharsets.UTF_8));
+            }
+            if (dayDateDdMmYy != null) {
+                try (FileOutputStream fos = app.openFileOutput(POSITIONING_DAY_DATE_FILE, Context.MODE_PRIVATE)) {
+                    fos.write(dayDateDdMmYy.getBytes(StandardCharsets.UTF_8));
+                }
+            } else {
+                File dateFile = new File(app.getFilesDir(), POSITIONING_DAY_DATE_FILE);
+                if (dateFile.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    dateFile.delete();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    public static boolean isPositioningDayStarted(Context ctx) {
+        try {
+            File f = new File(ctx.getApplicationContext().getFilesDir(), POSITIONING_DAY_ACTIVE_FILE);
+            if (!f.exists()) return false;
+            try (FileInputStream in = new FileInputStream(f)) {
+                int b = in.read();
+                return b == '1';
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Nullable
+    public static String getPositioningDayDate(Context ctx) {
+        try {
+            File f = new File(ctx.getApplicationContext().getFilesDir(), POSITIONING_DAY_DATE_FILE);
+            if (!f.exists()) return null;
+            try (FileInputStream in = new FileInputStream(f)) {
+                byte[] buf = new byte[(int) Math.min(f.length(), 32)];
+                int n = in.read(buf);
+                if (n <= 0) return null;
+                return new String(buf, 0, n, StandardCharsets.UTF_8).trim();
+            }
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** Save the selected bus number */
@@ -359,6 +449,171 @@ public class Prefs {
         boolean value = prefs.getBoolean(KEY_PENDING_RELAUNCH_AFTER_UNLOCK, false);
         if (value) prefs.edit().putBoolean(KEY_PENDING_RELAUNCH_AFTER_UNLOCK, false).apply();
         return value;
+    }
+
+    /** Set before starting install so PackageReplacedReceiver can report INSTALL_SUCCESS. Uses commit() so it survives process kill. */
+    public static void setPendingInstallReportContext(Context ctx, int releaseId, int fromV, int toV) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_PENDING_INSTALL_REPORT, true)
+                .putInt(KEY_PENDING_INSTALL_RELEASE_ID, releaseId)
+                .putInt(KEY_PENDING_INSTALL_FROM_V, fromV)
+                .putInt(KEY_PENDING_INSTALL_TO_V, toV)
+                .commit();
+    }
+
+    /** Returns {releaseId, fromV, toV} if a pending install report was set, then clears. Otherwise null. */
+    public static int[] getAndClearPendingInstallReportContext(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        if (!prefs.getBoolean(KEY_PENDING_INSTALL_REPORT, false)) return null;
+        int[] out = new int[]{
+                prefs.getInt(KEY_PENDING_INSTALL_RELEASE_ID, -1),
+                prefs.getInt(KEY_PENDING_INSTALL_FROM_V, -1),
+                prefs.getInt(KEY_PENDING_INSTALL_TO_V, -1)
+        };
+        prefs.edit()
+                .remove(KEY_PENDING_INSTALL_REPORT)
+                .remove(KEY_PENDING_INSTALL_RELEASE_ID)
+                .remove(KEY_PENDING_INSTALL_FROM_V)
+                .remove(KEY_PENDING_INSTALL_TO_V)
+                .apply();
+        return out;
+    }
+
+    /** Reset on each boot (call from BootReceiver). LockFirstActivity shows loading only when this is false. */
+    public static void setLockFirstShownThisBoot(Context ctx, boolean shown) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_LOCK_FIRST_SHOWN_THIS_BOOT, shown)
+                .apply();
+    }
+
+    public static boolean getLockFirstShownThisBoot(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_LOCK_FIRST_SHOWN_THIS_BOOT, false);
+    }
+
+    public static void setLastUpdateCheckAt(Context ctx, long millis) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putLong(KEY_LAST_UPDATE_CHECK_AT, millis)
+                .apply();
+    }
+
+    public static long getLastUpdateCheckAt(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getLong(KEY_LAST_UPDATE_CHECK_AT, 0L);
+    }
+
+    /** yyyy-MM-dd of last calendar-day sync queue purge (see SyncQueueMaintenance). */
+    public static String getSyncQueueDayPurgeKey(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_SYNC_QUEUE_DAY_PURGE, "");
+    }
+
+    public static void setSyncQueueDayPurgeKey(Context ctx, String yyyyMmDd) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_SYNC_QUEUE_DAY_PURGE, yyyyMmDd)
+                .apply();
+    }
+
+    /** Set by a check-only update run when the server reports a newer release. */
+    public static void setUpdateAvailable(Context ctx, int versionCode, @Nullable String versionName) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_UPDATE_AVAILABLE, true)
+                .putInt(KEY_UPDATE_AVAILABLE_VERSION_CODE, versionCode)
+                .putString(KEY_UPDATE_AVAILABLE_VERSION_NAME, versionName)
+                .apply();
+    }
+
+    public static void clearUpdateAvailable(Context ctx) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_UPDATE_AVAILABLE, false)
+                .remove(KEY_UPDATE_AVAILABLE_VERSION_CODE)
+                .remove(KEY_UPDATE_AVAILABLE_VERSION_NAME)
+                .apply();
+    }
+
+    public static boolean isUpdateAvailable(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_UPDATE_AVAILABLE, false);
+    }
+
+    public static int getUpdateAvailableVersionCode(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(KEY_UPDATE_AVAILABLE_VERSION_CODE, 0);
+    }
+
+    @Nullable
+    public static String getUpdateAvailableVersionName(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_UPDATE_AVAILABLE_VERSION_NAME, null);
+    }
+
+    public static void setLastUpdateResult(Context ctx, String result) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_LAST_UPDATE_RESULT, result)
+                .apply();
+    }
+
+    @Nullable
+    public static String getLastUpdateResult(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_LAST_UPDATE_RESULT, null);
+    }
+
+    /** When a FULL (nightly / install-now) update run last reached the server. Drives the 23:59 fallback. */
+    public static void setLastNightlyUpdateRunAt(Context ctx, long millis) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putLong(KEY_LAST_NIGHTLY_UPDATE_RUN_AT, millis)
+                .apply();
+    }
+
+    public static long getLastNightlyUpdateRunAt(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getLong(KEY_LAST_NIGHTLY_UPDATE_RUN_AT, 0L);
+    }
+
+    public static void setLastUploadSuccessAt(Context ctx, long millis) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putLong(KEY_LAST_UPLOAD_SUCCESS_AT, millis)
+                .apply();
+    }
+
+    public static long getLastUploadSuccessAt(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getLong(KEY_LAST_UPLOAD_SUCCESS_AT, 0L);
+    }
+
+    /** Consecutive failed Settings PIN attempts; reset on successful login. */
+    public static int getSettingsFailedLogins(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(KEY_SETTINGS_FAILED_LOGINS, 0);
+    }
+
+    public static void setSettingsFailedLogins(Context ctx, int count) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putInt(KEY_SETTINGS_FAILED_LOGINS, count)
+                .commit();
+    }
+
+    public static long getSettingsLockedUntil(Context ctx) {
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getLong(KEY_SETTINGS_LOCKED_UNTIL, 0L);
+    }
+
+    public static void setSettingsLockedUntil(Context ctx, long millis) {
+        ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putLong(KEY_SETTINGS_LOCKED_UNTIL, millis)
+                .commit();
     }
 
 }

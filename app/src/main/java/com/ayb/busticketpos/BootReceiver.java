@@ -12,40 +12,46 @@ import java.util.List;
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
+        try {
+            try { App.scheduleDailyFetch(ctx); } catch (Exception e) { Log.w("BootReceiver", "scheduleDailyFetch failed", e); }
+            try { App.scheduleDailyFetchFallback(ctx); } catch (Exception e) { Log.w("BootReceiver", "scheduleDailyFetchFallback failed", e); }
+            try { LocationForegroundService.startIfNeeded(ctx); } catch (Exception e) { Log.w("BootReceiver", "LocationForegroundService start failed", e); }
+            try { InternetEnforcerReceiver.enforce(ctx); } catch (Exception e) { Log.w("BootReceiver", "InternetEnforcerReceiver failed", e); }
+            try { InternetEnforcerScheduler.schedule(ctx); } catch (Exception e) { Log.w("BootReceiver", "InternetEnforcerScheduler failed", e); }
+        } catch (Exception e) {
+            Log.e("BootReceiver", "onReceive failed", e);
+            return;
+        }
 
-        LocationForegroundService.startIfNeeded(ctx);
+        if (intent == null) return;
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
+                && !Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())) {
+            return;
+        }
 
-        InternetEnforcerReceiver.enforce(ctx);
-        InternetEnforcerScheduler.schedule(ctx);
-
-        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
-                || Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())) {
-
+        try {
             Log.d("BootReceiver", "Device rebooted — checking if app already running...");
+            Prefs.setBootReady(ctx, false);
+            Prefs.setLockFirstShownThisBoot(ctx, false);
 
-            Prefs.setBootReady(ctx, false); // reset on each reboot
-
-            // 🧩 Check if Menu activity is already running as the launcher
             ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
             if (am != null) {
                 List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
                 if (!tasks.isEmpty()) {
                     ComponentName topActivity = tasks.get(0).topActivity;
-                    if (topActivity != null &&
-                            topActivity.getPackageName().equals(ctx.getPackageName())) {
+                    if (topActivity != null && topActivity.getPackageName().equals(ctx.getPackageName())) {
                         Log.d("BootReceiver", "App already running — skip launching Menu");
-                        return; // 🚫 skip duplicate launch
+                        return;
                     }
                 }
             }
 
-            // Only launch if not already running
-            Log.d("BootReceiver", "App not running — launching Menu...");
-            Intent launchIntent = new Intent(ctx, Menu.class);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            Log.d("BootReceiver", "App not running — launching LockFirstActivity...");
+            Intent launchIntent = new Intent(ctx, LockFirstActivity.class);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             ctx.startActivity(launchIntent);
+        } catch (Exception e) {
+            Log.e("BootReceiver", "Boot launch failed", e);
         }
     }
 

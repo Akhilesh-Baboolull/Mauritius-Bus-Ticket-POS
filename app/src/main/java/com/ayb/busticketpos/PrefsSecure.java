@@ -3,6 +3,7 @@ package com.ayb.busticketpos;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
+import android.util.Log;
 
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKeys;
@@ -16,20 +17,38 @@ public class PrefsSecure {
 
     public static SharedPreferences getSecurePrefs(Context context) {
         if (securePrefs == null) {
-            try {
-                String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
-                securePrefs = EncryptedSharedPreferences.create(
-                        "secure_config_prefs",
-                        masterKeyAlias,
-                        context,
-                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                );
-            } catch (GeneralSecurityException | IOException e) {
-                throw new RuntimeException("Failed to initialize secure preferences", e);
+            synchronized (PrefsSecure.class) {
+                if (securePrefs == null) {
+                    securePrefs = openSecurePrefs(context.getApplicationContext(), false);
+                }
             }
         }
         return securePrefs;
+    }
+
+    private static SharedPreferences openSecurePrefs(Context appCtx, boolean afterReset) {
+        try {
+            String masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC);
+            return EncryptedSharedPreferences.create(
+                    "secure_config_prefs",
+                    masterKeyAlias,
+                    appCtx,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+        } catch (GeneralSecurityException | IOException e) {
+            if (!afterReset) {
+                Log.e("PrefsSecure", "Encrypted prefs failed — clearing and retrying once", e);
+                try {
+                    appCtx.deleteSharedPreferences("secure_config_prefs");
+                } catch (Exception del) {
+                    Log.w("PrefsSecure", "Could not delete secure_config_prefs", del);
+                }
+                return openSecurePrefs(appCtx, true);
+            }
+            Log.e("PrefsSecure", "Encrypted prefs unavailable after reset", e);
+            return appCtx.getSharedPreferences("secure_config_prefs_fallback", Context.MODE_PRIVATE);
+        }
     }
 
     // 🔒 Save tenant ID

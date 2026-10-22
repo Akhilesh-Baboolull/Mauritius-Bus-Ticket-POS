@@ -1,12 +1,14 @@
 package com.ayb.busticketpos;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
 import org.json.JSONObject;
 
 public final class PositioningClient {
+    private static final String TAG = "PositioningClient";
     private PositioningClient(){}
 
     // 🧠 Shared background executor for sending location data
@@ -36,32 +38,35 @@ public final class PositioningClient {
                             Callback cb) {
 
         EXEC.execute(() -> {
+            JSONObject payload = null;
             try {
-                JSONObject payload = new JSONObject()
+                payload = new JSONObject()
                         .put("date", dateYmdHms)
                         .put("tenant_id", tenantId)
                         .put("machine_id", machineId)
-                        .put("busNo", busNo)
+                        .put("busNo", busNo == null ? JSONObject.NULL : busNo)
                         .put("location", latLng == null || latLng.trim().isEmpty() ? JSONObject.NULL : latLng.trim())
                         .put("current_route", currentRoute == null || currentRoute.trim().isEmpty() ? JSONObject.NULL : currentRoute)
                         .put("tripNo", tripNo == null ? JSONObject.NULL : tripNo)
                         .put("battery_level", batteryLevel == null ? JSONObject.NULL : batteryLevel);
 
-                try {
-                    String respStr = HttpUtil.postJson(ApiEndpoints.BASE + "/positioning.php", payload.toString());
-                    JSONObject resp = new JSONObject(respStr);
-                    if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        if (cb != null) cb.onSuccess(resp);
-                    } else {
-                        LogSink.logTerminalFailure(ctx, ApiEndpoints.BASE + "/positioning.php",
-                                payload.toString(), resp.optString("message", "server fail"));
-                        if (cb != null) cb.onFail(resp.optString("message", "server fail"));
-                    }
-                } catch (Exception netOrParse) {
-                    SyncQueueUtil.enqueue(ctx, ApiEndpoints.BASE + "/positioning.php", payload, netOrParse.getMessage());
-                    if (cb != null) cb.onFail(netOrParse.getMessage());
+                Log.i(TAG, "Sending location to server: date=" + dateYmdHms + " machineId=" + machineId
+                        + " busNo=" + busNo + " route=" + currentRoute + " tripNo=" + tripNo
+                        + " battery=" + batteryLevel + " location=" + (latLng != null ? latLng : "null"));
+                String respStr = HttpUtil.postJson(ApiEndpoints.POSITIONING, payload.toString());
+                JSONObject resp = HttpUtil.parseJsonObjectLenient(respStr);
+                if ("success".equalsIgnoreCase(resp.optString("status"))) {
+                    Log.i(TAG, "Location sent successfully to server");
+                    if (cb != null) cb.onSuccess(resp);
+                } else {
+                    LogSink.logTerminalFailure(ctx, ApiEndpoints.POSITIONING,
+                            payload.toString(), resp.optString("message", "server fail"));
+                    if (cb != null) cb.onFail(resp.optString("message", "server fail"));
                 }
             } catch (Exception e) {
+                // Do not queue every failed ping while offline — that filled sync_queue and OOM'd the device.
+                // Latest location is sent on the next successful interval when online.
+                Log.w(TAG, "send skipped (offline or server error): " + e.getMessage());
                 if (cb != null) cb.onFail(e.getMessage());
             }
         });

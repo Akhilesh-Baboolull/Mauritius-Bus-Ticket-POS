@@ -40,6 +40,9 @@ public final class UpdateInstaller {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        // So PackageReplacedReceiver can report INSTALL_SUCCESS when install actually succeeds (even if InstallResultReceiver got status=1 first)
+        Prefs.setPendingInstallReportContext(ctx, releaseId, fromV, toV);
+
         session.commit(pendingIntent.getIntentSender());
         session.close();
     }

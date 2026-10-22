@@ -18,6 +18,9 @@ public interface BusDao {
     @Query("SELECT * FROM bus_numbers")
     List<BusEntity> getAllBusesLive();
 
+    @Query("SELECT COUNT(*) FROM bus_numbers")
+    int countAll();
+
     /** Clear out the table */
     @Query("DELETE FROM bus_numbers")
     void clearAll();

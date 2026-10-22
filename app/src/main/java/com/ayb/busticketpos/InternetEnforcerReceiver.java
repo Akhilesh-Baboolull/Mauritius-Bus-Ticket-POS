@@ -7,7 +7,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
-import android.os.Build;
 import android.os.UserManager;
 import android.util.Log;
 
@@ -16,7 +15,11 @@ public class InternetEnforcerReceiver extends BroadcastReceiver {
     @SuppressLint("UnsafeProtectedBroadcastReceiver")
     @Override
     public void onReceive(Context context, Intent intent) {
-        enforce(context);
+        Context app = context.getApplicationContext();
+        enforce(app);
+        if (SyncQueueMaintenance.isOnline(app)) {
+            SyncQueueMaintenance.pruneAndScheduleDrainWhenOnline(app, true);
+        }
     }
 
     public static void enforce(Context context) {

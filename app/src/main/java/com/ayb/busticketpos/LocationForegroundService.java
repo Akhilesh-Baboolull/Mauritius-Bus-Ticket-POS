@@ -8,7 +8,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.location.Location;
 import android.os.BatteryManager;
-import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -45,6 +44,13 @@ public class LocationForegroundService extends Service {
 
     private FusedLocationProviderClient fused;
     private LocationCallback callback;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    /** SEND_NOW / SEND_DAY_END can arrive before deferred FusedLocation init; replay when ready. */
+    private volatile boolean pendingSendNow = false;
+    private volatile boolean pendingSendDayEnd = false;
+    @Nullable private volatile PositioningSnapshot pendingSnapshot = null;
+    @Nullable private volatile PositioningSnapshot immediateSnapshot = null;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -68,9 +74,13 @@ public class LocationForegroundService extends Service {
     }
 
     public static void start(Context ctx) {
-        Context app = ctx.getApplicationContext();
-        Intent i = new Intent(app, LocationForegroundService.class);
-        app.startForegroundService(i);
+        try {
+            Context app = ctx.getApplicationContext();
+            Intent i = new Intent(app, LocationForegroundService.class);
+            app.startForegroundService(i);
+        } catch (Exception e) {
+            android.util.Log.e("LocationFG", "start failed", e);
+        }
     }
 
     public static void stop(Context ctx) {
@@ -80,8 +90,16 @@ public class LocationForegroundService extends Service {
     }
 
     public static void sendNow(Context ctx) {
+        sendNow(ctx, null);
+    }
+
+    /** @param snapshot operational fields from main process (required for correct bus/route/trip in :bg). */
+    public static void sendNow(Context ctx, @Nullable PositioningSnapshot snapshot) {
         Context app = ctx.getApplicationContext();
         Intent i = new Intent(app, LocationForegroundService.class).setAction(ACTION_SEND_NOW);
+        if (snapshot != null) {
+            snapshot.attachTo(i);
+        }
         app.startForegroundService(i);
     }
 
@@ -96,29 +114,39 @@ public class LocationForegroundService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Call startForeground() immediately so we satisfy the timeout when :bg process cold-starts.
-        ensureChannel();
-        startForeground(NOTIF_ID, buildNotif("Tracking enabled"));
-        Log.i(TAG, "Foreground notification posted; deferring location client init");
+        try {
+            ensureChannel();
+            startForeground(NOTIF_ID, buildNotif("Tracking enabled"));
+            Log.i(TAG, "Foreground notification posted; deferring location client init");
+        } catch (Exception e) {
+            Log.e(TAG, "onCreate: failed to start foreground", e);
+            stopSelf();
+            return;
+        }
 
         // Defer the rest so onCreate() returns quickly; avoids ForegroundServiceDidNotStartInTimeException.
         new Handler(Looper.getMainLooper()).post(() -> {
-            Log.d(TAG, "Deferred init: creating FusedLocationProviderClient and applying mode");
-            fused = LocationServices.getFusedLocationProviderClient(this);
-            callback = new LocationCallback() {
-                @Override
-                public void onLocationResult(@NonNull LocationResult locationResult) {
-                    Location loc = locationResult.getLastLocation();
-                    if (loc == null) return;
-
-                    // Normal periodic sends: cached state is ok (stable payload).
-                    postLocation(loc, false);
-
-                    // Update mode if DB day status changed.
-                    applyModeFromDbIfNeeded(false);
-                }
-            };
-            applyModeFromDbIfNeeded(true);
+            try {
+                Log.d(TAG, "Deferred init: creating FusedLocationProviderClient and applying mode");
+                fused = LocationServices.getFusedLocationProviderClient(this);
+                callback = new LocationCallback() {
+                    @Override
+                    public void onLocationResult(@NonNull LocationResult locationResult) {
+                        try {
+                            Location loc = locationResult.getLastLocation();
+                            if (loc == null) return;
+                            postLocation(loc, false, false);
+                            applyModeFromDbIfNeeded(false);
+                        } catch (Exception e) {
+                            Log.e(TAG, "onLocationResult failed", e);
+                        }
+                    }
+                };
+                applyModeFromDbIfNeeded(true);
+                flushPendingImmediateSends();
+            } catch (Exception e) {
+                Log.e(TAG, "Deferred init failed", e);
+            }
         });
     }
 
@@ -143,20 +171,18 @@ public class LocationForegroundService extends Service {
             }
 
             if (ACTION_SEND_NOW.equals(action)) {
-                Log.d(TAG, "onStartCommand: ACTION_SEND_NOW — force refresh and send once");
-                // Force refresh state (don’t use cached payload)
-                sendImmediateOnce(true);
+                PositioningSnapshot snap = PositioningSnapshot.fromIntent(intent);
+                Log.d(TAG, "onStartCommand: ACTION_SEND_NOW snapshot=" + snap);
+                requestImmediateSend(false, snap);
             }
 
             if (ACTION_SEND_DAY_END.equals(action)) {
-                Log.d(TAG, "onStartCommand: ACTION_SEND_DAY_END — force refresh (day ended)");
-                // Day just ended: force refresh so busNo/tripNo/route are nulled correctly.
-                sendImmediateOnce(true);
+                Log.d(TAG, "onStartCommand: ACTION_SEND_DAY_END — day ended ping");
+                requestImmediateSend(true, null);
             }
         }
 
-        // In case DB day status changed while service was alive, re-apply mode.
-        applyModeFromDbIfNeeded(false);
+        try { applyModeFromDbIfNeeded(false); } catch (Exception e) { Log.e(TAG, "applyModeFromDbIfNeeded failed", e); }
 
         return START_STICKY;
     }
@@ -178,28 +204,23 @@ public class LocationForegroundService extends Service {
 
     private void applyModeFromDbIfNeeded(boolean force) {
         io.execute(() -> {
-            if (fused == null || callback == null) return; // Deferred init not done yet
-            boolean dayActive = BgStateRepo.isDayActive(getApplicationContext());
-
-            // Mode changes = invalidate cached payload so it updates quickly
-            if (modeAppliedOnce && dayActive != lastDayActive) {
-                invalidateStateCache();
-            }
-
-            if (!force && modeAppliedOnce && dayActive == lastDayActive) return;
-
-            lastDayActive = dayActive;
-            modeAppliedOnce = true;
-
-            LocationRequest req = buildRequest(dayActive);
-
-            try { fused.removeLocationUpdates(callback); } catch (Exception ignored) {}
-
             try {
-                fused.requestLocationUpdates(req, callback, getMainLooper());
-                Log.d(TAG, "Mode applied dayActive=" + dayActive + " interval=" + (dayActive ? "30s" : "5min"));
-            } catch (SecurityException se) {
-                Log.e(TAG, "Missing location permission", se);
+                if (fused == null || callback == null) return;
+                boolean dayActive = BgStateRepo.isDayActive(getApplicationContext());
+                if (modeAppliedOnce && dayActive != lastDayActive) invalidateStateCache();
+                if (!force && modeAppliedOnce && dayActive == lastDayActive) return;
+                lastDayActive = dayActive;
+                modeAppliedOnce = true;
+                LocationRequest req = buildRequest(dayActive);
+                try { fused.removeLocationUpdates(callback); } catch (Exception ignored) {}
+                try {
+                    fused.requestLocationUpdates(req, callback, getMainLooper());
+                    Log.d(TAG, "Mode applied dayActive=" + dayActive + " interval=" + (dayActive ? "30s" : "5min"));
+                } catch (SecurityException se) {
+                    Log.e(TAG, "Missing location permission", se);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "applyModeFromDbIfNeeded worker failed", e);
             }
         });
     }
@@ -222,90 +243,156 @@ public class LocationForegroundService extends Service {
     // One-shot send (prefer current location)
     // ---------------------------------------------------------------------
 
-    private void sendImmediateOnce(boolean forceRefreshState) {
-        if (fused == null) return; // Deferred init not done yet
+    private void requestImmediateSend(boolean dayEnded, @Nullable PositioningSnapshot snapshot) {
+        invalidateStateCache();
+        immediateSnapshot = snapshot;
+        if (fused == null) {
+            if (dayEnded) {
+                pendingSendDayEnd = true;
+                pendingSnapshot = null;
+            } else {
+                pendingSendNow = true;
+                pendingSnapshot = snapshot;
+            }
+            Log.d(TAG, "Immediate send queued (location client not ready) dayEnded=" + dayEnded);
+            return;
+        }
+        try {
+            sendImmediateOnce(true, dayEnded, snapshot);
+        } catch (Exception e) {
+            Log.e(TAG, "requestImmediateSend failed dayEnded=" + dayEnded, e);
+        }
+    }
+
+    private void flushPendingImmediateSends() {
+        if (fused == null) return;
+        final boolean sendNow = pendingSendNow;
+        final boolean sendDayEnd = pendingSendDayEnd;
+        final PositioningSnapshot snap = pendingSnapshot;
+        pendingSendNow = false;
+        pendingSendDayEnd = false;
+        pendingSnapshot = null;
+        if (!sendNow && !sendDayEnd) return;
+        Log.i(TAG, "Flushing pending immediate send(s) now=" + sendNow + " dayEnd=" + sendDayEnd);
+        mainHandler.post(() -> {
+            try {
+                if (sendNow) {
+                    sendImmediateOnce(true, false, snap);
+                }
+                if (sendDayEnd) {
+                    invalidateStateCache();
+                    sendImmediateOnce(true, true, null);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "flushPendingImmediateSends failed", e);
+            }
+        });
+    }
+
+    private void sendImmediateOnce(boolean forceRefreshState, boolean dayEnded,
+                                   @Nullable PositioningSnapshot snapshot) {
+        if (fused == null) {
+            requestImmediateSend(dayEnded, snapshot);
+            return;
+        }
+        immediateSnapshot = snapshot;
         try {
             CancellationTokenSource cts = new CancellationTokenSource();
             fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.getToken())
                     .addOnSuccessListener(loc -> {
-                        if (loc != null) {
-                            postLocation(loc, forceRefreshState);
-                        } else {
-                            fused.getLastLocation().addOnSuccessListener(last -> {
-                                if (last != null) postLocation(last, forceRefreshState);
-                            });
+                        try {
+                            if (loc != null) {
+                                postLocation(loc, forceRefreshState, dayEnded);
+                            } else {
+                                fused.getLastLocation().addOnSuccessListener(last -> {
+                                    try {
+                                        if (last != null) postLocation(last, forceRefreshState, dayEnded);
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "getLastLocation callback failed", e);
+                                    }
+                                });
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "sendImmediateOnce callback failed", e);
                         }
                     });
-        } catch (SecurityException ignored) {}
+        } catch (Exception e) {
+            Log.e(TAG, "sendImmediateOnce failed", e);
+        }
     }
 
     // ---------------------------------------------------------------------
     // Payload send: shape fields exactly as your server rules require
     // ---------------------------------------------------------------------
 
-    private void postLocation(Location loc, boolean forceRefreshState) {
-
+    private void postLocation(Location loc, boolean forceRefreshState, boolean dayEnded) {
+        if (loc == null) return;
         final String tenantStr  = PrefsSecure.getTenantId(this);
         final String machineStr = PrefsSecure.getMachineId(this);
-
         final String latLng = loc.getLatitude() + ", " + loc.getLongitude();
         final int batteryPct = getBatteryPct();
 
         io.execute(() -> {
-            int tenantId, machineId;
             try {
-                tenantId  = Integer.parseInt(tenantStr);
-                machineId = Integer.parseInt(machineStr);
+                int tenantId, machineId;
+                try {
+                    tenantId  = Integer.parseInt(tenantStr != null ? tenantStr.trim() : "0");
+                    machineId = Integer.parseInt(machineStr != null ? machineStr.trim() : "0");
+                } catch (NumberFormatException e) {
+                    Log.w(TAG, "Invalid tenant/machine id, skip send");
+                    return;
+                }
+
+                String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
+
+                PositioningSnapshot snap = immediateSnapshot;
+                immediateSnapshot = null;
+
+                final boolean dayActive;
+                final boolean tripActive;
+                final String busNo;
+                final String route;
+                final Integer tripNo;
+
+                if (dayEnded) {
+                    dayActive = false;
+                    tripActive = false;
+                    busNo = null;
+                    route = null;
+                    tripNo = null;
+                } else if (snap != null) {
+                    dayActive = snap.dayActive;
+                    tripActive = snap.tripActive;
+                    busNo = snap.dayActive ? snap.busNo : null;
+                    route = (snap.dayActive && snap.tripActive) ? snap.currentRoute : null;
+                    tripNo = (snap.dayActive && snap.tripActive) ? snap.tripNo : null;
+                } else {
+                    BgState st = getState(forceRefreshState);
+                    dayActive = st.dayActive;
+                    tripActive = st.tripActive;
+                    busNo = !dayActive ? null : st.busNo;
+                    route = (!dayActive || !tripActive) ? null : st.currentRoute;
+                    tripNo = (!dayActive || !tripActive) ? null : st.tripNo;
+                }
+
+                Log.i(TAG, "positioning payload bus=" + busNo + " route=" + route + " tripNo=" + tripNo
+                        + " dayEnded=" + dayEnded + " usedSnapshot=" + (snap != null));
+
+                PositioningClient.send(
+                        getApplicationContext(),
+                        date,
+                        tenantId,
+                        machineId,
+                        busNo,
+                        latLng,
+                        route,
+                        tripNo,
+                        batteryPct,
+                        null
+                );
             } catch (Exception e) {
-                return;
+                Log.e(TAG, "postLocation worker failed", e);
             }
-
-            String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    .format(new Date());
-
-            BgState st = getState(forceRefreshState);
-
-            // ✅ Apply your exact rules:
-            final boolean dayActive  = st.dayActive;
-            final boolean tripActive = st.tripActive;
-
-            final String busNo;
-            final String route;
-            final Integer tripNo;
-
-            if (!dayActive) {
-                // Day inactive: only core fields
-                busNo = null;
-                route = null;
-                tripNo = null;
-            } else if (!tripActive) {
-                // Day active, trip inactive: include bus only
-                busNo = st.busNo;
-                route = null;
-                tripNo = null;
-            } else {
-                // Trip active: include bus + route + tripNo
-                busNo = st.busNo;
-                route = st.currentRoute;
-                tripNo = st.tripNo;
-            }
-
-            // Debug (optional)
-            // Log.d("BUS_DEBUG", "payloadState day=" + dayActive + " trip=" + tripActive +
-            //         " bus=[" + busNo + "] route=[" + route + "] tripNo=[" + tripNo + "]");
-
-            PositioningClient.send(
-                    getApplicationContext(),
-                    date,
-                    tenantId,
-                    machineId,
-                    busNo,        // null when day inactive
-                    latLng,
-                    route,        // null unless trip active
-                    tripNo,       // null unless trip active
-                    batteryPct,
-                    null
-            );
         });
     }
 
@@ -314,17 +401,20 @@ public class LocationForegroundService extends Service {
     // ---------------------------------------------------------------------
 
     private BgState getState(boolean forceRefresh) {
-        long now = System.currentTimeMillis();
-
-        if (!forceRefresh) {
-            BgState st = cachedState;
-            if (st != null && (now - cachedAtMs) <= STATE_CACHE_MS) return st;
+        try {
+            long now = System.currentTimeMillis();
+            if (!forceRefresh) {
+                BgState st = cachedState;
+                if (st != null && (now - cachedAtMs) <= STATE_CACHE_MS) return st;
+            }
+            BgState fresh = BgStateRepo.read(getApplicationContext());
+            cachedState = fresh;
+            cachedAtMs = now;
+            return fresh;
+        } catch (Exception e) {
+            Log.e(TAG, "getState failed", e);
+            return BgState.inactive();
         }
-
-        BgState fresh = BgStateRepo.read(getApplicationContext());
-        cachedState = fresh;
-        cachedAtMs = now;
-        return fresh;
     }
 
     private void invalidateStateCache() {
@@ -349,24 +439,32 @@ public class LocationForegroundService extends Service {
     // ---------------------------------------------------------------------
 
     private void ensureChannel() {
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (nm == null) return;
-
-        NotificationChannel ch = new NotificationChannel(
-                CH_ID,
-                "Background Location",
-                NotificationManager.IMPORTANCE_LOW
-        );
-        nm.createNotificationChannel(ch);
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            NotificationChannel ch = new NotificationChannel(
+                    CH_ID,
+                    "Background Location",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            nm.createNotificationChannel(ch);
+        } catch (Exception e) {
+            Log.e(TAG, "ensureChannel failed", e);
+        }
     }
 
     private Notification buildNotif(String text) {
-        return new NotificationCompat.Builder(this, CH_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground) // change to R.mipmap.ic_launcher if needed
-                .setContentTitle("Bus Ticket POS")
-                .setContentText(text)
-                .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .build();
+        try {
+            return new NotificationCompat.Builder(this, CH_ID)
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setContentTitle("Bus Ticket POS")
+                    .setContentText(text)
+                    .setOngoing(true)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .build();
+        } catch (Exception e) {
+            Log.e(TAG, "buildNotif failed", e);
+            return new NotificationCompat.Builder(this, CH_ID).setContentTitle("Bus Ticket POS").setContentText(text).build();
+        }
     }
 }

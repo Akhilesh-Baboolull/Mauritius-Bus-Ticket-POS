@@ -2,14 +2,38 @@
 package com.ayb.busticketpos;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class SyncClient {
+    private static final String TAG = "SyncClient";
+
+    /**
+     * One shared worker for all sync API calls. Do not use a throwaway
+     * {@code Executors.newSingleThreadExecutor()} per call — on Android the executor can be
+     * finalized before the runnable runs, so create_day (etc.) never hit the network while the
+     * UI still showed "day started".
+     */
+    private static final ExecutorService EXEC = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "SyncClient");
+        t.setPriority(Thread.NORM_PRIORITY);
+        return t;
+    });
+
+    /** Own queue so start-day is never blocked behind ticket/end-day HTTP. */
+    private static final ExecutorService EXEC_DAY = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "SyncClient-createDay");
+        t.setPriority(Thread.NORM_PRIORITY);
+        return t;
+    });
+
     private SyncClient(){}
 
     public interface Callback {
@@ -21,12 +45,47 @@ public final class SyncClient {
         return Integer.parseInt(s);
     }
 
+    private static int intOrZero(String s) {
+        try {
+            return s == null ? 0 : Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** createDay callbacks must run on main thread (navigation / Toast in Day). */
+    private static void deliverCreateDayOnMain(Callback cb, boolean success, JSONObject resp, String failReason) {
+        if (cb == null) return;
+        new Handler(Looper.getMainLooper()).post(() -> {
+            try {
+                if (success && resp != null) {
+                    cb.onSuccess(resp);
+                } else {
+                    cb.onFail(failReason != null ? failReason : "unknown");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "createDay callback crashed", e);
+            }
+        });
+    }
+
     /** Create Day */
     public static void createDay(Context ctx, String prefsDate_ddMMyy, String busNo, Callback cb) {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        Log.d(TAG, "createDay scheduled (dedicated createDay thread)");
+        EXEC_DAY.execute(() -> {
+            Log.d(TAG, "createDay runnable executing");
+            final Context appCtx = ctx.getApplicationContext();
             try {
-                int userId    = safeInt(PrefsSecure.getTenantId(ctx));
-                int machineId = safeInt(PrefsSecure.getMachineId(ctx));
+                String tenantStr = PrefsSecure.getTenantId(appCtx);
+                String machineStr = PrefsSecure.getMachineId(appCtx);
+                if (tenantStr == null || tenantStr.trim().isEmpty()
+                        || machineStr == null || machineStr.trim().isEmpty()) {
+                    Log.e(TAG, "createDay: missing tenant_id or machine_id — register device first");
+                    deliverCreateDayOnMain(cb, false, null, "Missing tenant or machine ID (register device)");
+                    return;
+                }
+                int userId    = safeInt(tenantStr.trim());
+                int machineId = safeInt(machineStr.trim());
 
                 String date       = DateFmt.prefsToServerDate(prefsDate_ddMMyy); // yyyy-MM-dd
                 String start_time = DateFmt.nowServerDateTime();                  // yyyy-MM-dd HH:mm:ss
@@ -38,29 +97,36 @@ public final class SyncClient {
                         .put("bus_no", busNo)
                         .put("start_time", start_time);
 
+                Log.i(TAG, "createDay POST " + ApiEndpoints.CREATE_DAY + " bus=" + busNo + " date=" + date);
+
                 try {
                     String respStr = HttpUtil.postJson(ApiEndpoints.CREATE_DAY, payload.toString());
-                    JSONObject resp = new JSONObject(respStr);
+                    Log.d(TAG, "createDay HTTP returned, parsing JSON…");
+                    JSONObject resp = HttpUtil.parseJsonObjectLenient(respStr);
                     if ("success".equalsIgnoreCase(resp.optString("status"))) {
                         int serverDayId = resp.optInt("id", 0);
                         if (serverDayId > 0) {
-                            Prefs.saveCurrentServerDayID(ctx, serverDayId);
+                            Prefs.saveCurrentServerDayID(appCtx, serverDayId);
                         }
-                        if (cb != null) cb.onSuccess(resp);
+                        Log.i(TAG, "createDay success serverDayId=" + serverDayId);
+                        deliverCreateDayOnMain(cb, true, resp, null);
                     } else {
                         // server responded fail → enqueue
-                        LogSink.logTerminalFailure(ctx, ApiEndpoints.CREATE_DAY, payload.toString(),
-                                resp.optString("message", "server fail"));
-                        if (cb != null) cb.onFail(resp.optString("message", "server fail"));
+                        String msg = resp.optString("message", "server fail");
+                        Log.w(TAG, "createDay server fail: " + msg);
+                        LogSink.logTerminalFailure(appCtx, ApiEndpoints.CREATE_DAY, payload.toString(), msg);
+                        deliverCreateDayOnMain(cb, false, null, msg);
                     }
                 } catch (Exception netOrParse) {
-                    // no feedback → enqueue
-                    SyncQueueUtil.enqueue(ctx, ApiEndpoints.CREATE_DAY, payload, netOrParse.getMessage());
-                    if (cb != null) cb.onFail(netOrParse.getMessage());
+                    // IOException (network) or JSONException (bad body) → enqueue for retry
+                    Log.w(TAG, "createDay network/parse error, queueing: " + netOrParse.getMessage());
+                    SyncQueueUtil.enqueue(appCtx, ApiEndpoints.CREATE_DAY, payload, netOrParse.getMessage());
+                    deliverCreateDayOnMain(cb, false, null, netOrParse.getMessage());
                 }
 
             } catch (Exception e) {
-                if (cb != null) cb.onFail(e.getMessage());
+                Log.e(TAG, "createDay failed", e);
+                deliverCreateDayOnMain(cb, false, null, e.getMessage());
             }
         });
     }
@@ -79,7 +145,7 @@ public final class SyncClient {
                               float otherExpenses,
                               Callback cb) {
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        EXEC.execute(() -> {
             try {
                 int userId    = safeInt(PrefsSecure.getTenantId(ctx));
                 int machineId = safeInt(PrefsSecure.getMachineId(ctx));
@@ -129,7 +195,7 @@ public final class SyncClient {
                                  String routeName,
                                  String routeDirection,
                                  Callback cb) {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        EXEC.execute(() -> {
             try {
                 int userId    = safeInt(PrefsSecure.getTenantId(ctx));
                 int machineId = safeInt(PrefsSecure.getMachineId(ctx));
@@ -177,7 +243,7 @@ public final class SyncClient {
                                int dayId,
                                int tripNo,
                                Callback cb) {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        EXEC.execute(() -> {
             try {
                 int userId    = safeInt(PrefsSecure.getTenantId(ctx));
                 int machineId = safeInt(PrefsSecure.getMachineId(ctx));
@@ -224,7 +290,7 @@ public final class SyncClient {
             int amount,               // send as int
             Callback cb
     ) {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        EXEC.execute(() -> {
             try {
                 int userId    = safeInt(PrefsSecure.getTenantId(ctx));
                 int machineId = safeInt(PrefsSecure.getMachineId(ctx));
@@ -281,7 +347,7 @@ public final class SyncClient {
     public static void recordBlankTicket(Context ctx,
                                          String datetimeYmdHms,   // "yyyy-MM-dd HH:mm:ss"
                                          Callback cb) {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        EXEC.execute(() -> {
             try {
                 int userId    = safeInt(PrefsSecure.getTenantId(ctx));
                 int machineId = safeInt(PrefsSecure.getMachineId(ctx));
@@ -324,6 +390,52 @@ public final class SyncClient {
         });
     }
 
+    /**
+     * Report a failed Settings PIN attempt. The entered PIN is never sent.
+     * Queued for retry when offline, like other sync events.
+     */
+    public static void reportSettingsFailedLogin(Context ctx,
+                                                 int attemptNo,
+                                                 boolean locked,
+                                                 long lockedUntilMillis) {
+        final Context appCtx = ctx.getApplicationContext();
+        EXEC.execute(() -> {
+            JSONObject payload;
+            try {
+                long versionCode = 0;
+                try {
+                    versionCode = appCtx.getPackageManager()
+                            .getPackageInfo(appCtx.getPackageName(), 0)
+                            .getLongVersionCode();
+                } catch (Exception ignored) {
+                }
+                payload = new JSONObject()
+                        .put("tenant_id", intOrZero(PrefsSecure.getTenantId(appCtx)))
+                        .put("machine_id", intOrZero(PrefsSecure.getMachineId(appCtx)))
+                        .put("attempt_time", DateFmt.nowServerDateTime())
+                        .put("attempt_no", attemptNo)
+                        .put("locked", locked)
+                        .put("locked_until", locked
+                                ? new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                                        .format(new java.util.Date(lockedUntilMillis))
+                                : JSONObject.NULL)
+                        .put("app_version_code", versionCode);
+            } catch (Exception e) {
+                Log.w(TAG, "reportSettingsFailedLogin: payload build failed", e);
+                return;
+            }
 
+            try {
+                String respStr = HttpUtil.postJson(ApiEndpoints.SETTINGS_FAILED_LOGIN, payload.toString());
+                JSONObject resp = HttpUtil.parseJsonObjectLenient(respStr);
+                if (!"success".equalsIgnoreCase(resp.optString("status"))) {
+                    LogSink.logTerminalFailure(appCtx, ApiEndpoints.SETTINGS_FAILED_LOGIN,
+                            payload.toString(), resp.optString("message", "server fail"));
+                }
+            } catch (Exception netOrParse) {
+                SyncQueueUtil.enqueue(appCtx, ApiEndpoints.SETTINGS_FAILED_LOGIN, payload, netOrParse.getMessage());
+            }
+        });
+    }
 
 }

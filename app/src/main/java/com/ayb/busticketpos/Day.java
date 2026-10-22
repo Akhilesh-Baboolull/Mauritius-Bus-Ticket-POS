@@ -2,6 +2,7 @@
 package com.ayb.busticketpos;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -113,7 +114,7 @@ public class Day extends AppCompatActivity {
         });
 
         btn_submit_waybill.setOnClickListener(v -> {
-            Executors.newSingleThreadExecutor().execute(() -> {
+            AppExecutors.runBg(() -> {
                 AppDatabase db = AppDatabase.getInstance(this);
                 String today = Prefs.getDayDate(this);
 
@@ -127,18 +128,20 @@ public class Day extends AppCompatActivity {
 
                 // 1️⃣ Get current day row
                 TicketDayEntity day = db.ticketDao().getLastDay();
-                db.ticketDao().updateEndTime(currentTime, day.id);
-
                 if (day == null){
                     Prefs.clearDay(this);
                     Prefs.clearSelectedBus(this);
-
-
-                    startActivity(new Intent(Day.this, Menu.class)
-                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));
-                    finish();
+                    runOnUiThread(() -> {
+                        startActivity(new Intent(Day.this, Menu.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                        finish();
+                    });
                     return;
                 }
+                db.ticketDao().updateEndTime(currentTime, day.id);
+                Prefs.clearSelectedBus(this);
+                Prefs.clearDay(this);
+                LocationForegroundService.sendOnDayEnd(getApplicationContext());
 
                 // 3️⃣ Check if a waybill already exists
                 DayWaybillEntity existing = db.dayWaybillDao().getForDay(day.id);
@@ -173,8 +176,15 @@ public class Day extends AppCompatActivity {
                     db.dayWaybillDao().insert(waybill);
                 }
 
+                runOnUiThread(() -> {
+                    Toast.makeText(Day.this, "Waybill saved. Day ended.", Toast.LENGTH_LONG).show();
+                    startActivity(new Intent(Day.this, Menu.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                    finish();
+                });
+
                 SyncClient.endDay(
-                        this,
+                        getApplicationContext(),
                         serverDayId,
                         todayPrefs,
                         bus,
@@ -185,28 +195,14 @@ public class Day extends AppCompatActivity {
                         meal,
                         maint,
                         otherExp,
-                        new SyncClient.Callback() {
-                            @Override public void onSuccess(JSONObject resp) { /* optional */ }
-                            @Override public void onFail(String reason) { /* optional */ }
-                        }
+                        null
                 );
-
-                // 6️⃣ End the day
-                runOnUiThread(() -> {
-                    Prefs.clearSelectedBus(this);
-                    Prefs.clearDay(this);
-                    LocationForegroundService.sendOnDayEnd(this);
-
-                    Toast.makeText(this, "Waybill saved. Day ended.", Toast.LENGTH_LONG).show();
-                    startActivity(new Intent(this, Menu.class));
-                    finish();
-                });
             });
         });
 
         btn_skip_waybill.setOnClickListener(v -> {
 
-            Executors.newSingleThreadExecutor().execute(() -> {
+            AppExecutors.runBg(() -> {
                 AppDatabase db = AppDatabase.getInstance(this);
                 String today = Prefs.getDayDate(this);
 
@@ -220,17 +216,20 @@ public class Day extends AppCompatActivity {
 
                 // 1️⃣ Get current day row
                 TicketDayEntity day = db.ticketDao().getLastDay();
-
-                db.ticketDao().updateEndTime(currentTime, day.id);
-
                 if (day == null){
                     Prefs.clearDay(this);
                     Prefs.clearSelectedBus(this);
-                    startActivity(new Intent(Day.this, Menu.class)
-                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));
-                    finish();
+                    runOnUiThread(() -> {
+                        startActivity(new Intent(Day.this, Menu.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                        finish();
+                    });
                     return;
                 }
+                db.ticketDao().updateEndTime(currentTime, day.id);
+                Prefs.clearSelectedBus(this);
+                Prefs.clearDay(this);
+                LocationForegroundService.sendOnDayEnd(getApplicationContext());
 
                 // 3️⃣ Check if a waybill already exists
                 DayWaybillEntity existing = db.dayWaybillDao().getForDay(day.id);
@@ -257,33 +256,22 @@ public class Day extends AppCompatActivity {
                     db.dayWaybillDao().insert(waybill);
                 }
 
+                runOnUiThread(() -> {
+                    Toast.makeText(Day.this, "Waybill skipped. Day ended.", Toast.LENGTH_LONG).show();
+                    startActivity(new Intent(Day.this, Menu.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                    finish();
+                });
+
                 SyncClient.endDay(
-                        this,
+                        getApplicationContext(),
                         serverDayId,
                         todayPrefs,
                         bus,
                         total,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        new SyncClient.Callback() {
-                            @Override public void onSuccess(JSONObject resp) { /* optional */ }
-                            @Override public void onFail(String reason) { /* optional */ }
-                        }
+                        0, 0, 0, 0, 0, 0,
+                        null
                 );
-
-                // 6️⃣ End the day
-                runOnUiThread(() -> {
-                    Prefs.clearSelectedBus(this);
-                    Prefs.clearDay(this);
-                    LocationForegroundService.sendOnDayEnd(this);
-                    Toast.makeText(this, "Waybill skipped. Day ended.", Toast.LENGTH_LONG).show();
-                    startActivity(new Intent(this, Menu.class));
-                    finish();
-                });
             });
 
 
@@ -474,82 +462,74 @@ public class Day extends AppCompatActivity {
 
                     String selectedBus = busNos.get(currentIndex);
 
-                    // • persist bus
                     Prefs.saveSelectedBus(this, selectedBus);
 
-                    // • persist day status + today’s date
                     String today = new SimpleDateFormat("dd/MM/yy", Locale.getDefault())
                             .format(new Date());
-
-                    String todayPrefs = new SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(new Date());
+                    String todayPrefs = today;
 
                     Prefs.SaveDay(this, today, 1);
 
-                    String currentTime = new SimpleDateFormat(
+                    Log.d("DayStatus", "Day Started (local)");
+
+                    // Navigate immediately — do not wait for create_day HTTP (was 1–2s+ on Menu open).
+                    returnToMenuAfterStartDay(null);
+
+                    final String startTime = new SimpleDateFormat(
                             "HH:mm:ss", Locale.getDefault()
                     ).format(new Date());
+                    final Context app = getApplicationContext();
 
-                    // 2️⃣ Store Day info in DB
-                    Executors.newSingleThreadExecutor().execute(() -> {
-                        AppDatabase db = AppDatabase.getInstance(this);
-
-                        // Avoid duplicate insert — check if a row already exists
-//                        TicketDayEntity existing = db.ticketDao().getDay(today, selectedBus);
-
-//                        if (existing == null) {
+                    AppExecutors.runBg(() -> {
+                        try {
+                            AppDatabase db = AppDatabase.getInstance(app);
                             TicketDayEntity dayEntity = new TicketDayEntity();
                             dayEntity.date = today;
                             dayEntity.busNo = selectedBus;
-                            dayEntity.start_time = currentTime;
+                            dayEntity.start_time = startTime;
+                            long thisdayId = db.ticketDao().insertDay(dayEntity);
 
-                            long thisday_id = db.ticketDao().insertDay(dayEntity);
+                            ReportsEntity re = new ReportsEntity();
+                            re.dayId = (int) thisdayId;
+                            re.date = today;
+                            re.current_trip_report = 0;
+                            re.all_trip_reports = 0;
+                            re.custom_report = 0;
+                            re.summary_report = 0;
+                            db.reportCountDao().insertCount(re);
+                            LocationForegroundService.sendNow(
+                                    app, PositioningSnapshot.dayStart(selectedBus));
+                        } catch (Exception e) {
+                            Log.e("Day", "Local day insert failed", e);
+                        }
 
-//                        }
-//                        else{
-//                            Integer lastTripNo = db.ticketDao().getLastTripNoForDay(existing.id);
-//                            if (lastTripNo != null) {
-//                                Prefs.saveTripCount(this, lastTripNo);
-//                            } else {
-//                                Prefs.saveTripCount(this, 0); // fallback to 0 if no trips yet
-//                            }
-//
-//                        }
+                        SyncClient.createDay(app, todayPrefs, selectedBus, new SyncClient.Callback() {
+                            @Override public void onSuccess(JSONObject resp) { /* server id saved in SyncClient */ }
 
-                        ReportsEntity re = new ReportsEntity();
-                        re.dayId = (int) thisday_id;
-                        re.date = today;
-                        re.current_trip_report = 0;
-                        re.all_trip_reports = 0;
-                        re.custom_report = 0;
-                        re.summary_report = 0;
-
-                        db.reportCountDao().insertCount(re);
-
-                    });
-
-                    // 🔌 call API (async). On success it will store server day id.
-                    SyncClient.createDay(
-                            this,
-                            todayPrefs,
-                            selectedBus,
-                            new SyncClient.Callback() {
-                                @Override public void onSuccess(JSONObject resp) {
-
-                                }
-                                @Override public void onFail(String reason) {
-
-                                }
+                            @Override public void onFail(String reason) {
+                                if (reason == null || reason.isEmpty()) return;
+                                new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                                        Toast.makeText(app,
+                                                "Day started locally. Server sync will retry.",
+                                                Toast.LENGTH_LONG).show());
                             }
-                    );
-
-                    LocationForegroundService.sendNow(Day.this);
-                    // • switch to “End Day” UI
-                    startActivity(new Intent(Day.this, Menu.class)
-                            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));
-                    finish();
+                        });
+                    });
                 });
             });
         });
+    }
+
+    /** After create_day completes (or fails / queued); optional toast if sync failed. */
+    private void returnToMenuAfterStartDay(@Nullable String syncFailReason) {
+        if (syncFailReason != null && !syncFailReason.isEmpty()) {
+            Toast.makeText(this,
+                    "Day started locally. Server sync: " + syncFailReason + " (will retry if queued)",
+                    Toast.LENGTH_LONG).show();
+        }
+        startActivity(new Intent(Day.this, Menu.class)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+        finish();
     }
 
     /** Updates the displayed bus and arrow‐button states */

@@ -2,6 +2,7 @@
 package com.ayb.busticketpos;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.work.Constraints;
@@ -12,13 +13,17 @@ import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class SyncWorker extends Worker {
+    private static final String TAG = "SyncWorker";
+
     public SyncWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
     }
@@ -26,22 +31,51 @@ public class SyncWorker extends Worker {
     @NonNull @Override
     public Result doWork() {
         Context ctx = getApplicationContext();
+        SyncQueueMaintenance.prune(ctx);
+
         AppDatabase db = AppDatabase.getInstance(ctx);
         SyncJobDao dao = db.syncJobDao();
 
-        List<SyncJob> batch = dao.fetchBatch(25);
+        int pending = dao.count();
+        if (pending == 0) return Result.success();
+
+        int batchSize = pending > 80 ? 80 : Math.min(50, pending);
+        List<SyncJob> batch = dao.fetchBatchPrioritized(
+                ApiEndpoints.REPORT_URL,
+                ApiEndpoints.CREATE_DAY,
+                ApiEndpoints.START_TRIP,
+                ApiEndpoints.RECORD_TICKET,
+                ApiEndpoints.END_TRIP,
+                ApiEndpoints.END_DAY,
+                ApiEndpoints.BLANK_TICKET,
+                batchSize
+        );
         if (batch.isEmpty()) return Result.success();
+
+        Log.i(TAG, "Draining batch=" + batch.size() + " pending=" + pending);
 
         boolean anyFailed = false;
 
         for (SyncJob job : batch) {
+            if (ApiEndpoints.POSITIONING.equals(job.endpoint)
+                    && job.retryCount >= SyncQueueMaintenance.MAX_POSITIONING_RETRIES) {
+                dao.deleteById(job.id);
+                continue;
+            }
+            if (!ApiEndpoints.POSITIONING.equals(job.endpoint)
+                    && job.retryCount >= SyncQueueMaintenance.MAX_BUSINESS_RETRIES) {
+                Log.w(TAG, "Giving up after max retries id=" + job.id + " " + job.endpoint);
+                dao.deleteById(job.id);
+                continue;
+            }
+
             try {
                 String respStr;
-                if (UpdateConfig.REPORT_URL.equals(job.endpoint)) {
-                    // Update report endpoint requires X-Device-Id / X-Signature auth
+                if (ApiEndpoints.REPORT_URL.equals(job.endpoint)) {
                     String machineIdStr = PrefsSecure.getMachineId(ctx);
                     String apiKey = PrefsSecure.getApiKey(ctx);
-                    if (machineIdStr == null || machineIdStr.trim().isEmpty() || apiKey == null || apiKey.trim().isEmpty()) {
+                    if (machineIdStr == null || machineIdStr.trim().isEmpty()
+                            || apiKey == null || apiKey.trim().isEmpty()) {
                         anyFailed = true;
                         dao.markFailed(job.id, "Missing provisioning for report");
                         continue;
@@ -49,18 +83,37 @@ public class SyncWorker extends Worker {
                     int deviceId = Integer.parseInt(machineIdStr.trim());
                     byte[] bodyBytes = job.payloadJson.getBytes(StandardCharsets.UTF_8);
                     Map<String, String> headers = UpdateAuth.buildAuthHeaders(deviceId, apiKey, bodyBytes);
-                    respStr = UpdateHttp.postJson(job.endpoint, job.payloadJson, headers);
+                    respStr = HttpUtil.postJson(job.endpoint, job.payloadJson, headers);
                 } else {
                     respStr = HttpUtil.postJson(job.endpoint, job.payloadJson);
                 }
 
-                JSONObject resp = new JSONObject(respStr);
-                // Accept both legacy "status":"success" and report.php "ok":true
+                JSONObject resp;
+                try {
+                    resp = HttpUtil.parseJsonObjectLenient(respStr);
+                } catch (JSONException je) {
+                    Log.e(TAG, job.endpoint + " parse failed: " + je.getMessage());
+                    anyFailed = true;
+                    dao.markFailed(job.id, je.getMessage());
+                    continue;
+                }
                 boolean success = "success".equalsIgnoreCase(resp.optString("status", ""))
                         || resp.optBoolean("ok", false);
 
                 if (success) {
+                    if (ApiEndpoints.CREATE_DAY.equals(job.endpoint)) {
+                        int serverDayId = resp.optInt("id", 0);
+                        if (serverDayId > 0) {
+                            Prefs.saveCurrentServerDayID(ctx, serverDayId);
+                        }
+                    } else if (ApiEndpoints.START_TRIP.equals(job.endpoint)) {
+                        int tripId = resp.optInt("trip_id", 0);
+                        if (tripId > 0) {
+                            Prefs.saveCurrentServerTripID(ctx, tripId);
+                        }
+                    }
                     dao.deleteById(job.id);
+                    Prefs.setLastUploadSuccessAt(ctx, System.currentTimeMillis());
                 } else {
                     anyFailed = true;
                     dao.markFailed(job.id, resp.optString("message", "server fail"));
@@ -71,17 +124,21 @@ public class SyncWorker extends Worker {
             }
         }
 
-        // If items remain, schedule one more drain (same unique name so we don't spawn hundreds of works and thrash GreedyScheduler).
-        if (dao.count() > 0) {
+        int remaining = dao.count();
+        if (remaining > 0) {
+            int delaySec = remaining > 100 ? 2 : (remaining > 30 ? 5 : 10);
             OneTimeWorkRequest req = new OneTimeWorkRequest.Builder(SyncWorker.class)
-                    .setInitialDelay(20, java.util.concurrent.TimeUnit.SECONDS)
-                    .setConstraints(new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .setInitialDelay(delaySec, TimeUnit.SECONDS)
+                    .setConstraints(new Constraints.Builder()
+                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                            .build())
                     .build();
-            WorkManager.getInstance(getApplicationContext()).enqueueUniqueWork(
+            WorkManager.getInstance(ctx).enqueueUniqueWork(
                     "sync-drain",
-                    ExistingWorkPolicy.REPLACE,
+                    ExistingWorkPolicy.KEEP,
                     req
             );
+            Log.d(TAG, "Scheduled next drain in " + delaySec + "s remaining=" + remaining);
         }
 
         return anyFailed ? Result.retry() : Result.success();

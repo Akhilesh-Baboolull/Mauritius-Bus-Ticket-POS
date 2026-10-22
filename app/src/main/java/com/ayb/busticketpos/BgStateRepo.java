@@ -1,54 +1,84 @@
 package com.ayb.busticketpos;
 
 import android.content.Context;
+import android.util.Log;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+/**
+ * Operational state for interval positioning in the {@code :bg} process.
+ * Uses a file flag from the main process (day started / not) plus Room — stale open
+ * {@code ticket_days} rows must not send {@code busNo} before the operator starts the day.
+ */
 public class BgStateRepo {
 
+    private static final String TAG = "BgStateRepo";
     private BgStateRepo() {}
 
-    /**
-     * True if there is an active day (end_time null/empty).
-     * This replaces Prefs day_status in the :bg process.
-     */
     public static boolean isDayActive(Context ctx) {
-        AppDatabase db = AppDatabase.getInstance(ctx.getApplicationContext());
-        TicketDao dao = db.ticketDao();
-        return dao.hasActiveDay() == 1;
+        if (!Prefs.isPositioningDayStarted(ctx)) {
+            return false;
+        }
+        try {
+            AppDatabase db = AppDatabase.getInstance(ctx.getApplicationContext());
+            TicketDayEntity day = db.ticketDao().getActiveDay();
+            return isCurrentOperationalDay(ctx, day);
+        } catch (Exception e) {
+            Log.w(TAG, "isDayActive failed (use inactive)", e);
+            return false;
+        }
     }
 
-    /**
-     * Reads current operational state from Room.
-     * Rules:
-     * - If day inactive: dayActive=false, tripActive=false, busNo/tripNo/route null.
-     * - If day active but trip inactive: dayActive=true, tripActive=false, busNo set, tripNo/route null.
-     * - If trip active: dayActive=true, tripActive=true, busNo + tripNo + route set.
-     */
     public static BgState read(Context ctx) {
-        AppDatabase db = AppDatabase.getInstance(ctx.getApplicationContext());
-        TicketDao dao = db.ticketDao();
-
-        // 1) Find active day
-        TicketDayEntity day = dao.getActiveDay();
-        if (day == null) {
+        if (!Prefs.isPositioningDayStarted(ctx)) {
             return BgState.inactive();
         }
+        try {
+            AppDatabase db = AppDatabase.getInstance(ctx.getApplicationContext());
+            TicketDao dao = db.ticketDao();
 
-        Integer dayId = day.id;
-        String busNo = trimOrNull(day.busNo);
+            TicketDayEntity day = dao.getActiveDay();
+            if (!isCurrentOperationalDay(ctx, day)) {
+                return BgState.inactive();
+            }
 
-        // 2) Find active trip for that day
-        TripEntity trip = dao.getActiveTripForDay(dayId);
+            String busNo = trimOrNull(day.busNo);
+            TripEntity trip = dao.getActiveTripForDay(day.id);
+            if (trip == null) {
+                return new BgState(true, false, day.id, busNo, null, null);
+            }
 
-        if (trip == null) {
-            // Day active, trip inactive
-            return new BgState(true, false, dayId, busNo, null, null);
+            return new BgState(
+                    true,
+                    true,
+                    day.id,
+                    busNo,
+                    trip.tripNo,
+                    trimOrNull(trip.route)
+            );
+        } catch (Exception e) {
+            Log.w(TAG, "read failed (use inactive)", e);
+            return BgState.inactive();
         }
+    }
 
-        Integer tripNo = trip.tripNo; // allow null if DB has null
-        String route = trimOrNull(trip.route);
+  /** Operator started day (file) and local open day matches today's operational date. */
+    private static boolean isCurrentOperationalDay(Context ctx, TicketDayEntity day) {
+        if (day == null) {
+            return false;
+        }
+        String today = todayDdMmYy();
+        if (!today.equals(day.date)) {
+            return false;
+        }
+        String published = Prefs.getPositioningDayDate(ctx);
+        return published == null || published.equals(day.date);
+    }
 
-        // Trip active implies day active
-        return new BgState(true, true, dayId, busNo, tripNo, route);
+    private static String todayDdMmYy() {
+        return new SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(new Date());
     }
 
     private static String trimOrNull(String s) {

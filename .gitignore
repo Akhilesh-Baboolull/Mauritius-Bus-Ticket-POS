@@ -1,15 +1,44 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Only files that are regenerated on a fresh clone / Android Studio import.
+
+# ---- Gradle / build output ----
+.gradle/
+build/
+**/build/
+.kotlin/
+.externalNativeBuild/
+.cxx/
+captures/
+
+# ---- Release artifacts (rebuilt and signed when needed) ----
+/release/
+/app/release/
+*.apk
+*.aab
+
+# ---- Machine-specific (Android Studio recreates it with your SDK path) ----
 local.properties
+
+# ---- Android Studio: per-user state only (shared project config stays tracked) ----
+*.iml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetSelector.xml
+.idea/deviceManager.xml
+.idea/appInsightsSettings.xml
+.idea/studiobot.xml
+.idea/other.xml
+.idea/androidTestResultsUserPreferences.xml
+
+# ---- Logs, dumps, OS files ----
+*.log
+*.hprof
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -107,25 +107,33 @@ public class Trip extends AppCompatActivity {
         btnEndTrip.setOnClickListener(v -> {
             String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
 
-            Executors.newSingleThreadExecutor().execute(() -> {
+            AppExecutors.runBg(() -> {
                 AppDatabase db = AppDatabase.getInstance(this);
 
                 try {
-                    // 🔹 Get current trip
                     TripEntity currentTrip = db.ticketDao().getLastTrip();
                     if (currentTrip != null) {
-                        // 🔹 Mark trip as ended
                         db.ticketDao().endTrip(currentTime, currentTrip.tripId);
                     }
 
-                    // 🔹 Get pref values
-                    int tripId = Prefs.getCurrentServerTripID(this);
-                    int dayId  = Prefs.getCurrentServerDayID(this);
-                    int tripNo = Prefs.getTripCount(this);
+                    final int tripId = Prefs.getCurrentServerTripID(this);
+                    final int dayId  = Prefs.getCurrentServerDayID(this);
+                    final int tripNo = Prefs.getTripCount(this);
+                    final String busNo = Prefs.getSelectedBus(this);
 
-                    // 🔹 Call SyncClient in background (no main thread blocking)
+                    Prefs.clearTrip(this);
+
+                    runOnUiThread(() -> {
+                        LocationForegroundService.sendNow(
+                                getApplicationContext(),
+                                PositioningSnapshot.tripEnded(busNo));
+                        startActivity(new Intent(Trip.this, Menu.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                        finish();
+                    });
+
                     SyncClient.endTrip(
-                            this,
+                            getApplicationContext(),
                             tripId,
                             dayId,
                             tripNo,
@@ -142,22 +150,13 @@ public class Trip extends AppCompatActivity {
                             }
                     );
 
-                    // 🔹 Send location update
-                    LocationForegroundService.sendNow(this);
-
-                    // 🔹 Clear trip prefs
-                    Prefs.clearTrip(this);
-
-                    // 🔹 Return to Menu activity (on UI thread)
-                    runOnUiThread(() -> {
-                        Intent i = new Intent(Trip.this, Menu.class)
-                                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                        startActivity(i);
-                        finish();
-                    });
-
                 } catch (Exception e) {
                     Log.e("Trip", "Error ending trip", e);
+                    runOnUiThread(() -> {
+                        startActivity(new Intent(Trip.this, Menu.class)
+                                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                        finish();
+                    });
                 }
             });
         });
@@ -368,56 +367,49 @@ public class Trip extends AppCompatActivity {
 
                     String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
 
-                    Executors.newSingleThreadExecutor().execute(() -> {
+                    AppExecutors.runBg(() -> {
                         TicketDayEntity day = db.ticketDao().getLastDay();
 
                         if (day == null) {
                             runOnUiThread(() ->
-                                    Toast.makeText(this, "⚠️ Cannot start trip – No matching Day record found.", Toast.LENGTH_LONG).show());
+                                    Toast.makeText(Trip.this, "⚠️ Cannot start trip – No matching Day record found.", Toast.LENGTH_LONG).show());
                             return;
                         }
 
-                        // 3️⃣ Increment & save trip number in Prefs
-                        int count = Prefs.getTripCount(this) + 1;
-                        Prefs.saveTripCount(this, count);
-                        Prefs.saveTripStatus(this, 1);  // mark trip "in progress"
+                        int count = Prefs.getTripCount(Trip.this) + 1;
+                        Prefs.saveTripCount(Trip.this, count);
+                        Prefs.saveTripStatus(Trip.this, 1);
 
-                        // 4️⃣ Create and insert new TripEntity
                         TripEntity trip = new TripEntity();
                         trip.dayId = day.id;
                         trip.tripNo = count;
                         trip.route = chosenRoute.routeName;
                         trip.direction = selectedDirection;
                         trip.start_time = currentTime;
-
-
                         db.ticketDao().insertTrip(trip);
 
-                        // send to server
-                        int serverDayId = Prefs.getCurrentServerDayID(this); // must be set from create_day success
-                        SyncClient.startTrip(
-                                this,
-                                serverDayId,
-                                count,
-                                chosenRoute.routeName,
-                                selectedDirection,
-                                new SyncClient.Callback() {
-                                    @Override public void onSuccess(org.json.JSONObject resp) {
-                                        // Optional: Log.d("SYNC_TRIP", "startTrip OK: " + resp);
-                                    }
-                                    @Override public void onFail(String reason) {
-                                        // Optional: Log.e("SYNC_TRIP", "startTrip FAIL: " + reason);
-                                    }
-                                }
-                        );
+                        final int serverDayId = Prefs.getCurrentServerDayID(Trip.this);
+                        final String routeName = chosenRoute.routeName;
+                        final String direction = selectedDirection;
 
-                        // 5️⃣ Launch Menu Activity
                         runOnUiThread(() -> {
-                            LocationForegroundService.sendNow(this);
+                            String busNo = Prefs.getSelectedBus(Trip.this);
+                            LocationForegroundService.sendNow(
+                                    getApplicationContext(),
+                                    PositioningSnapshot.tripStart(busNo, routeName, count));
                             startActivity(new Intent(Trip.this, Menu.class)
                                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
                             finish();
                         });
+
+                        SyncClient.startTrip(
+                                getApplicationContext(),
+                                serverDayId,
+                                count,
+                                routeName,
+                                direction,
+                                null
+                        );
                     });
                 });
 

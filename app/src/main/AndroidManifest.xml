@@ -7,6 +7,7 @@
         android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> <!-- For background location on Android 10+ -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> <!-- Foreground Service base permission -->
@@ -35,9 +36,15 @@
         <activity
             android:name=".Calculator"
             android:exported="false" />
+        <activity
+            android:name=".DeviceMaintenanceActivity"
+            android:exported="false" />
 
         <receiver
             android:name=".FetchReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".UpdateFallbackReceiver"
             android:exported="false" />
 
         <receiver
@@ -51,23 +58,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- ========================================================= -->
-        <!-- 1) SERVICES MOVED TO BACKGROUND PROCESS (:bg) -->
-        <!-- ========================================================= -->
-        <service
-            android:name=".SelfRecoveringLocationService"
-            android:exported="false"
-            android:foregroundServiceType="location|dataSync"
-            android:process=":bg"
-            android:stopWithTask="false"
-            tools:ignore="ForegroundServicePermission" />
+        <!-- Location service in :bg process so a crash in positioning does not take down the UI. -->
         <service
             android:name=".LocationForegroundService"
             android:exported="false"
             android:foregroundServiceType="location"
             android:process=":bg"
-            android:stopWithTask="false" /> <!-- ========================================================= -->
-        <!-- 2) BROADCAST RECEIVERS MOVED TO BACKGROUND PROCESS -->
+            android:stopWithTask="false" />
+        <!-- ========================================================= -->
+        <!-- 2) BROADCAST RECEIVERS -->
         <!-- ========================================================= -->
         <receiver
             android:name=".BootReceiver"
@@ -117,17 +116,21 @@
             android:name=".PrintTicket"
             android:exported="false" />
         <activity
-            android:name=".Menu"
+            android:name=".LockFirstActivity"
             android:exported="true"
             android:theme="@style/Theme.BusTicketPOS">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".Menu"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.BusTicketPOS" />
 
         <receiver
             android:name=".MyDeviceAdminReceiver"

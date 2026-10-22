@@ -10,6 +10,7 @@ import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.UserManager;
 import android.text.Layout;
 import android.text.Spannable;
@@ -35,6 +36,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -77,6 +79,7 @@ public class Menu extends AppCompatActivity {
     private TextView battery_icon, battery_state, battery_percentage, clock_view;
     android.os.Handler clockHandler;
     private Handler bootDelayHandler;
+    private BroadcastReceiver batteryReceiver;
     final boolean[] isSyncTriggered = {false};
 
     @SuppressLint({"MissingInflatedId", "WrongViewCast", "SetTextI18n"})
@@ -85,21 +88,22 @@ public class Menu extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_menu);
+        // Status bar (clock + battery) must paint before heavy Menu init — setupButtons() was
+        // blocking the main thread while battery updates sat queued on runOnUiThread().
+        initStatusBarEarly();
 
         // Kiosk: show over lock screen and turn screen on when launched (e.g. after update relaunch)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
-        }
+        setShowWhenLocked(true);
+        setTurnScreenOn(true);
 
-        // Safety net: ensure daily update alarm is scheduled whenever the launcher is opened (covers first boot / reset on POS 4 where App main process might not have run yet).
-        App.scheduleDailyFetch(this);
+        // Defer non-UI work so the status bar and transition paint first.
+        new Handler(Looper.getMainLooper()).post(this::runDeferredMenuCreateWork);
 
         long lastAlive = Prefs.getLastAlive(this);
         long now = System.currentTimeMillis();
-
-        if (now - lastAlive > 2 * 60_000) { // more than 2 minutes gap
-            CrashLogger.logError("SystemKill", new Exception("App was killed by system or force-closed. Gap=" + (now - lastAlive)/1000 + "s"));
+        // Informational only: app was in background or killed for a while. Use Log.w so it doesn't appear as a crash in crash log.
+        if (lastAlive > 0 && (now - lastAlive) > 2 * 60_000) {
+            Log.w("Menu", "App was in background or killed for " + ((now - lastAlive) / 1000) + "s (not a crash)");
         }
 
         // --- ① Safe-boot warm-up check ---
@@ -133,48 +137,47 @@ public class Menu extends AppCompatActivity {
             return insets;
         });
 
-        enableKioskModeIfDeviceOwner(this);
-
         if (!hasCheckedRedirect) {
             hasCheckedRedirect = true;
+            View redirectOverlay = findViewById(R.id.overlay);
+            ProgressBar redirectPb = findViewById(R.id.progressBar);
+            if (redirectOverlay != null) redirectOverlay.setVisibility(View.VISIBLE);
+            if (redirectPb != null) redirectPb.setVisibility(View.VISIBLE);
 
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    AppDatabase db = AppDatabase.getInstance(this);
-
-                    boolean hasRoutes = (db.routeDao().countAll() > 0);
-                    boolean hasStages = (db.stageDao().countAll() > 0);
-
-                    int tripStatus = Prefs.getTripStatus(this);  // 1 = in-progress
+                    AppDatabase db = AppDatabase.getInstance(Menu.this);
+                    boolean hasRoutes = db.routeDao().countAll() > 0;
+                    boolean hasStages = db.stageDao().countAll() > 0;
+                    int tripStatus = Prefs.getTripStatus(Menu.this);
 
                     runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
                         if (tripStatus == 1 && hasRoutes && hasStages) {
-                            // ✅ Data ready → proceed to PrintTicket
-                            Intent intent = new Intent(this, PrintTicket.class);
-                            startActivity(intent);
+                            startActivity(new Intent(Menu.this, PrintTicket.class));
                             finish();
-                        } else {
-                            // ⚠️ Missing data → stay in or return to Menu
-                            Log.w("Redirect", "Tables empty or sync incomplete — returning to Menu");
-                            Intent intent = new Intent(this, Menu.class);
-                            startActivity(intent);
-                            finish();
+                            return;
                         }
+                        if (redirectOverlay != null) redirectOverlay.setVisibility(View.GONE);
+                        if (redirectPb != null) redirectPb.setVisibility(View.GONE);
+                        initMenuUi();
                     });
-
                 } catch (Exception e) {
-                    // Fallback in case of DB or thread errors
                     Log.e("Redirect", "DB check failed", e);
                     runOnUiThread(() -> {
-                        Intent intent = new Intent(this, Menu.class);
-                        startActivity(intent);
-                        finish();
+                        if (isFinishing() || isDestroyed()) return;
+                        initMenuUi();
                     });
                 }
             });
+            return;
         }
 
+        initMenuUi();
+    }
 
+    /** Main Menu UI setup (called once redirect check is done or skipped). */
+    private void initMenuUi() {
         // Initialize the button by finding it by its ID from the layout
         btnPrintTicket = findViewById(R.id.btn_ticket);
         btn_start_day = findViewById(R.id.btn_start_day);
@@ -197,86 +200,16 @@ public class Menu extends AppCompatActivity {
         kiosk_admin_password = findViewById(R.id.admin_mode_password);
         btn_admin_mode_ok = findViewById(R.id.btn_admin_mode_exit);
         btn_admin_mode_cancel = findViewById(R.id.btn_admin_mode_close);
-        battery_percentage = findViewById(R.id.battery_percentage);
-        battery_state = findViewById(R.id.battery_state);
-        battery_icon = findViewById(R.id.battery_icon);
-        clock_view = findViewById(R.id.clock_view);
+        bindStatusBarWidgets();
+        refreshBatteryUiImmediate();
+        ensureBatteryReceiverRegistered();
+        ensureClockRunning();
         tenant_name = findViewById(R.id.tenant_name);
         tenant_name.setText(PrefsSecure.getTenantName(this));
 
-
-        // 🕒 Efficient live clock updater
-        clockHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        final Runnable clockRunnable = getRunnable(clockHandler);
-
-// Start updates
-        clockHandler.post(clockRunnable);
-        
-        registerReceiver(new BroadcastReceiver() {
-            @SuppressLint("SetTextI18n")
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-                int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-                int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-
-                int batteryPct;
-                if (level >= 0 && scale > 0) {
-                    batteryPct = (int) ((level / (float) scale) * 100);
-                } else {
-                    // Fallback: read directly
-                    BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE);
-                    batteryPct = bm != null
-                            ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-                            : 0;
-                }
-
-                // Log to verify
-                Log.d("BatteryDebug", "Updating UI: " + batteryPct + "%");
-
-                runOnUiThread(() -> {
-                    // Update UI safely
-                    battery_percentage.setText(batteryPct + "%");
-
-                    String stateText;
-                    String iconText = "🔋"; // default
-
-                    switch (status) {
-                        case BatteryManager.BATTERY_STATUS_CHARGING:
-                            stateText = "Charging";
-                            iconText = "⚡";
-                            break;
-                        case BatteryManager.BATTERY_STATUS_FULL:
-                            stateText = "Fully Charged";
-                            iconText = "🔋";
-                            break;
-                        case BatteryManager.BATTERY_STATUS_DISCHARGING:
-                        case BatteryManager.BATTERY_STATUS_NOT_CHARGING:
-                            stateText = "";
-                            iconText = "🔋";
-                            break;
-                        default:
-                            stateText = "";
-                    }
-
-                    battery_icon.setText(iconText);
-                    battery_state.setText(stateText);
-
-                    // Optional color change
-                    if (batteryPct < 20 && status != BatteryManager.BATTERY_STATUS_CHARGING) {
-                        battery_percentage.setTextColor(Color.RED);
-                        battery_icon.setTextColor(Color.RED);
-                    } else {
-                        battery_percentage.setTextColor(Color.BLACK);
-                        battery_icon.setTextColor(Color.WHITE);
-                    }
-                });
-            }
-        }, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-
         if(Prefs.getDayStatus(this) == 1){
             current_day.setText("Day Started: " + Prefs.getDayDate(this));
-            setupButtons();
+            new Handler(Looper.getMainLooper()).post(this::setupButtons);
 
             btn_start_day.setText("END DAY");
 
@@ -351,6 +284,12 @@ public class Menu extends AppCompatActivity {
             }
         });
 
+        View btnSettings = findViewById(R.id.btn_settings);
+        if (btnSettings != null) {
+            btnSettings.setOnClickListener(v ->
+                    startActivity(new Intent(Menu.this, DeviceMaintenanceActivity.class)));
+        }
+
         final int[] tapCount_update = {0};
         final long[] lastTapTime_update = {0};
 
@@ -369,17 +308,18 @@ public class Menu extends AppCompatActivity {
             if (tapCount_update[0] >= 10 && !isSyncTriggered[0]) {
                 isSyncTriggered[0] = true; // ✅ lock further triggers
 
-                PrefsCache.saveLastFetchTime(this, 0L);
                 Toast.makeText(this, "Updating... Keep internet connection stable.", Toast.LENGTH_LONG).show();
 
                 overlay.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.VISIBLE);
 
-                // 🚀 Force DB to reload in background
-                AppDatabase.forceRefresh(this);
-
-                // ⏳ Re-observe after triggering fetch
-                initialiseDB();
+                DatabaseSyncManager.forceSync(this, (success, message) -> {
+                    overlay.setVisibility(View.GONE);
+                    progressBar.setVisibility(View.GONE);
+                    if (success) {
+                        setupButtons();
+                    }
+                });
 
                 // Reset tap count
                 tapCount_update[0] = 0;
@@ -388,9 +328,231 @@ public class Menu extends AppCompatActivity {
 
     }
 
+    private static long lastMenuMaintenanceMs = 0L;
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        refreshMenuStateFromPrefs();
+    }
+
+    /** Lightweight refresh when Menu is brought back (singleTop) without full recreate. */
+    private void refreshMenuStateFromPrefs() {
+        if (btn_start_day == null || current_day == null) return;
+        if (Prefs.getDayStatus(this) == 1) {
+            current_day.setText("Day Started: " + Prefs.getDayDate(this));
+            btn_start_day.setText("END DAY");
+            btn_start_trip.setVisibility(View.VISIBLE);
+        } else {
+            current_day.setText("");
+            btn_start_day.setText("START DAY");
+            btn_start_trip.setVisibility(View.GONE);
+            btnPrintTicket.setVisibility(View.GONE);
+        }
+        if (Prefs.getTripStatus(this) == 1) {
+            current_trip.setText("Current Trip: " + Prefs.getSelectedDirectionName(this));
+            btn_start_trip.setText("STOP TRIP");
+            btnPrintTicket.setVisibility(View.VISIBLE);
+            btn_start_day.setVisibility(View.GONE);
+        } else {
+            current_trip.setText("");
+            btn_start_trip.setText("BEGIN TRIP");
+            btnPrintTicket.setVisibility(View.GONE);
+            btn_start_day.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        syncPositioningDayFlagFromPrefs();
+        refreshBatteryUiImmediate();
+        if (btn_start_day != null) {
+            refreshMenuStateFromPrefs();
+        }
+        new Handler(Looper.getMainLooper()).post(this::runDeferredMenuResumeWork);
+    }
+
+    /** Keep :bg positioning aligned with operator day state (file is read in :bg process). */
+    private void syncPositioningDayFlagFromPrefs() {
+        if (Prefs.getDayStatus(this) == 1) {
+            Prefs.publishPositioningDayState(this, true, Prefs.getDayDate(this));
+        } else {
+            Prefs.publishPositioningDayState(this, false, null);
+        }
+    }
+
+    private void runDeferredMenuCreateWork() {
+        if (isFinishing() || isDestroyed()) return;
+        App.scheduleDailyFetch(this);
+        App.scheduleDailyFetchFallback(this);
+    }
+
+    private static final long STALE_20H_MS = 20L * 3600 * 1000;
+    /** Avoid re-enqueueing / re-toasting on every Menu resume while the server is unreachable. */
+    private static final long AUTO_RETRY_THROTTLE_MS = 30L * 60 * 1000;
+    private static long lastAutoUpdateCheckAttemptMs = 0L;
+    private static long lastAutoMasterSyncAttemptMs = 0L;
+
+    /** 20h update check (check only) and master data refresh when Menu becomes visible. */
+    private void runStaleDataChecks() {
+        if (!Prefs.isBootReady(this)) return;
+        if (!SyncQueueMaintenance.isOnline(this)) return;
+        long now = System.currentTimeMillis();
+
+        if (now - Prefs.getLastUpdateCheckAt(this) > STALE_20H_MS
+                && now - lastAutoUpdateCheckAttemptMs > AUTO_RETRY_THROTTLE_MS) {
+            lastAutoUpdateCheckAttemptMs = now;
+            UpdateScheduler.enqueueCheckOnly(this, false);
+            Log.d("Menu", "Last update check > 20h — enqueued check-only");
+        }
+
+        if (PrefsCache.shouldFetchAgain(this)
+                && !DatabaseSyncManager.isSyncRunning()
+                && now - lastAutoMasterSyncAttemptMs > AUTO_RETRY_THROTTLE_MS) {
+            lastAutoMasterSyncAttemptMs = now;
+            DatabaseSyncManager.startSync(getApplicationContext(), AppDatabase.getInstance(this));
+            Log.d("Menu", "Last master data fetch > 20h — started sync (keeps existing data on failure)");
+        }
+    }
+
+    private void runDeferredMenuResumeWork() {
+        if (isFinishing() || isDestroyed()) return;
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
+            KioskHelper.applyLockTaskOnly(this);
+            blockStatusBarPullDown();
+        }
         LocationForegroundService.startIfNeeded(this);
+        long now = System.currentTimeMillis();
+        if (now - lastMenuMaintenanceMs > 60_000L) {
+            lastMenuMaintenanceMs = now;
+            SyncQueueMaintenance.pruneAndScheduleDrainWhenOnline(this, false);
+        }
+        runStaleDataChecks();
+    }
+
+    private void initStatusBarEarly() {
+        bindStatusBarWidgets();
+        refreshBatteryUiImmediate();
+        ensureBatteryReceiverRegistered();
+        ensureClockRunning();
+    }
+
+    private void bindStatusBarWidgets() {
+        if (clock_view != null) return;
+        clock_view = findViewById(R.id.clock_view);
+        battery_percentage = findViewById(R.id.battery_percentage);
+        battery_state = findViewById(R.id.battery_state);
+        battery_icon = findViewById(R.id.battery_icon);
+    }
+
+    /** One-shot read of sticky battery intent — safe before registerReceiver listener. */
+    private void refreshBatteryUiImmediate() {
+        bindStatusBarWidgets();
+        if (battery_percentage == null) return;
+        Intent sticky = ContextCompat.registerReceiver(
+                this,
+                null,
+                new IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+        applyBatteryUi(sticky);
+    }
+
+    @SuppressLint("SetTextI18n")
+    private void applyBatteryUi(@Nullable Intent intent) {
+        if (intent == null || battery_percentage == null) return;
+
+        int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+        int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+
+        int batteryPct;
+        if (level >= 0 && scale > 0) {
+            batteryPct = (int) ((level / (float) scale) * 100);
+        } else {
+            BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE);
+            batteryPct = bm != null
+                    ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                    : 0;
+        }
+
+        battery_percentage.setText(batteryPct + "%");
+
+        String stateText;
+        String iconText = "🔋";
+        switch (status) {
+            case BatteryManager.BATTERY_STATUS_CHARGING:
+                stateText = "Charging";
+                iconText = "⚡";
+                break;
+            case BatteryManager.BATTERY_STATUS_FULL:
+                stateText = "Fully Charged";
+                iconText = "🔋";
+                break;
+            case BatteryManager.BATTERY_STATUS_DISCHARGING:
+            case BatteryManager.BATTERY_STATUS_NOT_CHARGING:
+                stateText = "";
+                break;
+            default:
+                stateText = "";
+        }
+
+        battery_icon.setText(iconText);
+        battery_state.setText(stateText);
+
+        if (batteryPct < 20 && status != BatteryManager.BATTERY_STATUS_CHARGING) {
+            battery_percentage.setTextColor(Color.RED);
+            battery_icon.setTextColor(Color.RED);
+        } else {
+            battery_percentage.setTextColor(Color.BLACK);
+            battery_icon.setTextColor(Color.WHITE);
+        }
+    }
+
+    private void ensureBatteryReceiverRegistered() {
+        if (batteryReceiver != null) return;
+        batteryReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                applyBatteryUi(intent);
+            }
+        };
+        ContextCompat.registerReceiver(
+                this,
+                batteryReceiver,
+                new IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+    }
+
+    private void ensureClockRunning() {
+        if (clockHandler != null) return;
+        clockHandler = new Handler(getMainLooper());
+        clockHandler.post(getRunnable(clockHandler));
+    }
+
+    /** Shows a dialog asking to restart to complete registration; Restart button triggers reboot. */
+    private void showRestartToCompleteDialog() {
+        new AlertDialog.Builder(this)
+                .setMessage("Restart to complete registration")
+                .setCancelable(true)
+                .setPositiveButton("Restart", (dialog, which) -> rebootDeviceIfOwner())
+                .setNegativeButton("Later", (dialog, which) -> dialog.dismiss())
+                .show();
+    }
+
+    /** Reboot device so :bg process picks up new provisioning (tenant/machine id). Device owner only. */
+    private void rebootDeviceIfOwner() {
+        try {
+            DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+            if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) return;
+            ComponentName admin = new ComponentName(this, MyDeviceAdminReceiver.class);
+            dpm.reboot(admin);
+        } catch (Exception e) {
+            Log.e("Menu", "Reboot after registration failed", e);
+            Toast.makeText(this, "Registered. Please restart the device manually.", Toast.LENGTH_LONG).show();
+        }
     }
 
     @NonNull
@@ -419,10 +581,13 @@ public class Menu extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
 
-        try {
-            // Unregister battery receiver if registered (you passed null — that’s fine)
-            unregisterReceiver(null);
-        } catch (Exception ignored) {}
+        if (batteryReceiver != null) {
+            try {
+                unregisterReceiver(batteryReceiver);
+            } catch (Exception ignored) {
+            }
+            batteryReceiver = null;
+        }
 
         // ✅ Safely stop clock updates
         if (clockHandler != null) {
@@ -443,88 +608,9 @@ public class Menu extends AppCompatActivity {
     }
 
     private void enableKioskModeIfDeviceOwner(Context context) {
-        DevicePolicyManager dpm =
-                (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
-        ComponentName admin = new ComponentName(context, MyDeviceAdminReceiver.class);
-
-        if (dpm != null && dpm.isDeviceOwnerApp(context.getPackageName())) {
-            try {
-                // 1️⃣ Authorize this app for lock task mode
-                dpm.setLockTaskPackages(admin, new String[]{context.getPackageName()});
-                Log.d("KioskMode", "App authorized for Lock Task mode");
-
-                // 2️⃣ Grant overlay permission automatically (Device Owner only)
-                dpm.setPermissionGrantState(admin,
-                        getPackageName(),
-                        "android.permission.SYSTEM_ALERT_WINDOW",
-                        DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED);
-                Log.d("KioskMode", "Overlay permission granted silently");
-
-                // ✅ 2️⃣b. Grant all location permissions silently (Device Owner only)
-                try {
-                    // Step 1 — Foreground permissions first
-                    dpm.setPermissionGrantState(
-                            admin,
-                            getPackageName(),
-                            android.Manifest.permission.ACCESS_FINE_LOCATION,
-                            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
-                    );
-                    dpm.setPermissionGrantState(
-                            admin,
-                            getPackageName(),
-                            android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
-                    );
-
-                    // Step 2 — Background (Android 10+)
-                    dpm.setPermissionGrantState(
-                            admin,
-                            getPackageName(),
-                            android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-                            DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
-                    );
-
-                    // Step 3 — Foreground service permission (Android 14+)
-                    if (android.os.Build.VERSION.SDK_INT >= 34) {
-                        dpm.setPermissionGrantState(
-                                admin,
-                                getPackageName(),
-                                "android.permission.FOREGROUND_SERVICE_LOCATION",
-                                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
-                        );
-                    }
-
-                    Log.d("KioskMode", "All location permissions granted (including background)");
-                } catch (SecurityException se) {
-                    Log.w("KioskMode", "Failed to silently grant location permissions", se);
-                }
-
-                // 3️⃣ Keep status bar visible
-                try {
-                    dpm.setStatusBarDisabled(admin, false);
-                } catch (SecurityException se) {
-                    Log.w("KioskMode", "Could not control status bar visibility", se);
-                }
-
-                // 4️⃣ Start kiosk mode
-                startLockTask();
-                Log.d("KioskMode", "Lock Task started");
-
-                // 5️⃣ Add overlay to block swipe-down
-                blockStatusBarPullDown();
-                Log.d("KioskMode", "Swipe-down blocked");
-
-                dpm.setAutoTimeRequired(admin, true); // optional
-                dpm.setLockTaskPackages(admin, new String[]{getPackageName()});
-                dpm.setApplicationHidden(admin, getPackageName(), false);
-                dpm.setApplicationRestrictions(admin, getPackageName(), new Bundle());
-
-            } catch (Exception e) {
-                Log.e("KioskMode", "Failed to start Lock Task mode", e);
-            }
-        } else {
-            Log.w("KioskMode", "App is not Device Owner; cannot enter Lock Task mode");
-        }
+        KioskHelper.applyLockTaskOnly(this);
+        blockStatusBarPullDown();
+        Log.d("KioskMode", "Kiosk applied (lock task + swipe-down blocked)");
     }
 
 
@@ -859,7 +945,7 @@ public class Menu extends AppCompatActivity {
                     JSONObject body = new JSONObject();
                     body.put("tenant_id", tenantIdInt);
                     body.put("machine_id", machineIdInt);
-                    String resp = HttpUtil.postJson(UpdateConfig.PROVISION_URL, body.toString());
+                    String resp = HttpUtil.postJson(ApiEndpoints.PROVISION_URL, body.toString());
                     JSONObject j = new JSONObject(resp);
 
                     if (j.optBoolean("success", false)) {
@@ -877,6 +963,8 @@ public class Menu extends AppCompatActivity {
                             Toast.makeText(Menu.this,
                                     "Registered successfully. Tenant: " + tn + ", Phone: " + pn,
                                     Toast.LENGTH_LONG).show();
+                            // Reboot only on success so :bg picks up new provisioning
+                            showRestartToCompleteDialog();
                         });
                     } else {
                         String err = j.optString("error", "Unknown error");
@@ -1103,8 +1191,7 @@ public class Menu extends AppCompatActivity {
                 } catch (Exception ignored) { }
             }
         }
-        final String displayMsg = msg;
-        return displayMsg;
+        return msg;
     }
 
 }

@@ -1,21 +1,12 @@
 package com.ayb.busticketpos;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.room.*;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import java.lang.reflect.Type;
 import java.util.*;
-import java.util.concurrent.Executors;
 
 @Database(
         entities = {
@@ -66,8 +57,10 @@ public abstract class AppDatabase extends RoomDatabase {
                                 @Override
                                 public void onOpen(@NonNull SupportSQLiteDatabase db) {
                                     super.onOpen(db);
-
-                                    DatabaseSyncManager.startSync(ctx, INSTANCE);
+                                    // Only run sync when main process opens the DB; :bg opens it for BgStateRepo only.
+                                    if (!App.isBgProcess(ctx)) {
+                                        DatabaseSyncManager.startSync(ctx, INSTANCE);
+                                    }
                                 }
                             }).build();
                 }
@@ -76,15 +69,9 @@ public abstract class AppDatabase extends RoomDatabase {
         return INSTANCE;
     }
 
+    /** Force a master-data sync without wiping the DB instance (fetch-first, replace on success). */
     public static void forceRefresh(Context ctx) {
-        // Reset last fetch time
-        PrefsCache.saveLastFetchTime(ctx, 0L);
-
-        // Set INSTANCE to null so onOpen() callback gets triggered again
-        INSTANCE = null;
-
-        // Now re-initialize DB
-        getInstance(ctx);
+        DatabaseSyncManager.forceSync(ctx, null);
     }
 
     // Used to match JSON for route/stage

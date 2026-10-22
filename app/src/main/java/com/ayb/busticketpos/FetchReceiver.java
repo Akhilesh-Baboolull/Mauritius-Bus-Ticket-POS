@@ -17,9 +17,12 @@ public class FetchReceiver extends BroadcastReceiver {
         } catch (Exception e) {
             Log.e("FetchReceiver", "Failed to enqueue daily update", e);
         } finally {
-            // Always reschedule next day so the alarm is never lost (exact alarm is one-shot).
-            Log.d("FetchReceiver", "Rescheduling next daily fetch alarm");
-            App.scheduleDailyFetch(context);
+            try {
+                App.scheduleDailyFetch(context);
+                App.scheduleDailyFetchFallback(context);
+            } catch (Exception e) {
+                Log.e("FetchReceiver", "Reschedule alarm failed", e);
+            }
         }
     }
 }
