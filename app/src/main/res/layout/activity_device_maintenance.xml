@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF"
+    tools:context=".DeviceMaintenanceActivity">
+
+    <LinearLayout
+        android:id="@+id/panel_auth"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_margin="24dp"
+        android:background="#94948E"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="visible">
+
+        <ImageView
+            android:id="@+id/imageView4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:srcCompat="@mipmap/ayb_way_logo_foreground" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="ACCESS SETTINGS"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/maintenance_password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:ems="10"
+            android:hint="Password"
+            android:imeOptions="actionDone"
+            android:inputType="number"
+            android:minHeight="48dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/tv_login_lockout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:textColor="#FFEB3B"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_maintenance_unlock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="#031FB8"
+            android:text="Continue"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btn_maintenance_cancel_auth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:backgroundTint="#F44336"
+            android:text="Back" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/panel_tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <ImageView
+                android:id="@+id/imageView2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:srcCompat="@mipmap/ayb_way_logo_foreground" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif"
+                android:gravity="center"
+                android:text="Settings"
+                android:textColor="#000000"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <!-- App updates -->
+            <TextView
+                style="@style/SettingsSectionTitle"
+                android:text="Routes &amp; fares"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_master_last_fetch"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_master_counts"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_master_progress"
+                style="@style/SettingsStatus" />
+
+            <Button
+                android:id="@+id/btn_sync_master"
+                style="@style/SettingsButton"
+                android:backgroundTint="#031FB8"
+                android:text="Sync routes &amp; fares" />
+
+            <TextView
+                style="@style/SettingsSectionTitle"
+                android:text="Pending uploads" />
+
+            <TextView
+                android:id="@+id/queue_status_text"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_last_upload"
+                style="@style/SettingsRow" />
+
+            <TextView
+                style="@style/SettingsRow"
+                android:text="Failed uploads are kept up to 24 hours and cleared at the start of each new day."
+                android:textColor="#757575"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tv_upload_progress"
+                style="@style/SettingsStatus" />
+
+            <Button
+                android:id="@+id/btn_send_pending"
+                style="@style/SettingsButton"
+                android:backgroundTint="#031FB8"
+                android:text="Send pending data now" />
+
+            <Button
+                android:id="@+id/btn_clear_sync_queue"
+                style="@style/SettingsButton"
+                android:backgroundTint="#F44336"
+                android:text="Clear sync queue" />
+
+            <TextView
+                style="@style/SettingsSectionTitle"
+                android:text="App updates" />
+
+            <TextView
+                android:id="@+id/tv_installed_version"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_last_update_check"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_last_update_result"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_update_available"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_update_progress"
+                style="@style/SettingsStatus" />
+
+            <Button
+                android:id="@+id/btn_check_updates"
+                style="@style/SettingsButton"
+                android:backgroundTint="#031FB8"
+                android:text="Check for updates" />
+
+            <Button
+                android:id="@+id/btn_install_now"
+                style="@style/SettingsButton"
+                android:backgroundTint="#2B9B06"
+                android:text="Install now"
+                android:visibility="gone" />
+
+            <!-- Routes and fares -->
+
+            <!-- Pending uploads -->
+
+            <!-- Device status -->
+            <TextView
+                style="@style/SettingsSectionTitle"
+                android:text="Device status" />
+
+            <TextView
+                android:id="@+id/tv_internet"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_battery"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_day_trip"
+                style="@style/SettingsRow" />
+
+            <!-- About -->
+            <TextView
+                style="@style/SettingsSectionTitle"
+                android:text="About" />
+
+            <TextView
+                android:id="@+id/tv_btm_id"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_company"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_tenant_id"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_feedback_number"
+                style="@style/SettingsRow" />
+
+            <TextView
+                android:id="@+id/tv_server"
+                style="@style/SettingsRow" />
+
+            <Button
+                android:id="@+id/btn_maintenance_back"
+                style="@style/SettingsButton"
+                android:layout_marginTop="28dp"
+                android:backgroundTint="#03A9F4"
+                android:text="MENU" />
+        </LinearLayout>
+    </ScrollView>
+
+</FrameLayout>
