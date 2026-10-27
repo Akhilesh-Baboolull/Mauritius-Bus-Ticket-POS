@@ -16,7 +16,7 @@
         android:background="#94948E"
         android:orientation="vertical"
         android:padding="32dp"
-        android:visibility="visible">
+        android:visibility="gone">
 
         <ImageView
             android:id="@+id/imageView4"
@@ -78,7 +78,7 @@
         android:id="@+id/panel_tools"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone">
+        android:visibility="visible">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -125,6 +125,25 @@
                 style="@style/SettingsButton"
                 android:backgroundTint="#031FB8"
                 android:text="Sync routes &amp; fares" />
+
+            <TextView
+                style="@style/SettingsSectionTitle"
+                android:text="Screen brightness" />
+
+            <TextView
+                android:id="@+id/tv_brightness_value"
+                style="@style/SettingsRow" />
+
+            <SeekBar
+                android:id="@+id/seek_brightness"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:max="255"
+                android:min="10" />
+
+            <TextView
+                android:id="@+id/tv_brightness_note"
+                style="@style/SettingsStatus" />
 
             <TextView
                 style="@style/SettingsSectionTitle"

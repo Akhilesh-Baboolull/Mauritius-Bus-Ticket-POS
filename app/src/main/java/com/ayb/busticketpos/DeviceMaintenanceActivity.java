@@ -1,5 +1,7 @@
 package com.ayb.busticketpos;
 
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -9,12 +11,14 @@ import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -58,6 +62,9 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
 
     private TextView tvLoginLockout;
     private Button btnUnlock;
+
+    private SeekBar seekBrightness;
+    private TextView tvBrightnessValue, tvBrightnessNote;
 
     private final Runnable refreshLoop = new Runnable() {
         @Override
@@ -132,6 +139,8 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         btnInstallNow.setOnClickListener(v -> confirmInstallNow());
         btnSyncMaster.setOnClickListener(v -> syncMasterData());
         btnSendPending.setOnClickListener(v -> sendPendingNow());
+
+        setupBrightnessControl();
 
         observeUpdateWork();
     }
@@ -384,6 +393,80 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
                     : "Sync failed, existing routes & fares kept" + (message != null ? " (" + message + ")" : ""));
             if (unlocked) refreshAll();
         });
+    }
+
+    // ---------------------------------------------------------------------
+    // Screen brightness
+    // ---------------------------------------------------------------------
+
+    private void setupBrightnessControl() {
+        seekBrightness = findViewById(R.id.seek_brightness);
+        tvBrightnessValue = findViewById(R.id.tv_brightness_value);
+        tvBrightnessNote = findViewById(R.id.tv_brightness_note);
+
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        boolean canWrite = dpm != null && dpm.isDeviceOwnerApp(getPackageName());
+
+        int current = readSystemBrightness();
+        seekBrightness.setProgress(current);
+        tvBrightnessValue.setText("Brightness: " + brightnessPercent(current) + "%");
+
+        if (!canWrite) {
+            seekBrightness.setEnabled(false);
+            showStatus(tvBrightnessNote, "Brightness can only be changed when the app is device owner");
+            return;
+        }
+
+        seekBrightness.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvBrightnessValue.setText("Brightness: " + brightnessPercent(progress) + "%");
+                if (fromUser) applySystemBrightness(dpm, progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                applySystemBrightness(dpm, seekBar.getProgress());
+            }
+        });
+    }
+
+    /** Device owner write; switches off auto-brightness so the chosen level sticks. */
+    private void applySystemBrightness(DevicePolicyManager dpm, int value) {
+        try {
+            ComponentName admin = new ComponentName(this, MyDeviceAdminReceiver.class);
+            if (readBrightnessMode() != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL) {
+                dpm.setSystemSetting(admin, Settings.System.SCREEN_BRIGHTNESS_MODE,
+                        String.valueOf(Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL));
+                showStatus(tvBrightnessNote, "Auto-brightness turned off");
+            }
+            dpm.setSystemSetting(admin, Settings.System.SCREEN_BRIGHTNESS, String.valueOf(value));
+        } catch (Exception e) {
+            showStatus(tvBrightnessNote, "Could not change brightness: " + e.getMessage());
+        }
+    }
+
+    private int readSystemBrightness() {
+        try {
+            return Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS);
+        } catch (Exception e) {
+            return 128;
+        }
+    }
+
+    private int readBrightnessMode() {
+        try {
+            return Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS_MODE);
+        } catch (Exception e) {
+            return Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL;
+        }
+    }
+
+    private static int brightnessPercent(int value) {
+        return Math.round(value * 100f / 255f);
     }
 
     // ---------------------------------------------------------------------

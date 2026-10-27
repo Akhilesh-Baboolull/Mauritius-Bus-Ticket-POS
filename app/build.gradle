@@ -20,7 +20,7 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("D:\\AYB WAY\\Notes\\aybway_keystore.jks") // Use your exact matching JKS path
+            storeFile rootProject.file("keystore/aybway_keystore")
             storePassword "AYB2025"
             keyAlias "key"
             keyPassword "AYB2025"
@@ -37,7 +37,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {
