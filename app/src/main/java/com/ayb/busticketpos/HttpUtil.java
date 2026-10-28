@@ -170,7 +170,11 @@ public class HttpUtil {
         conn.setReadTimeout(120000);
         conn.setRequestMethod("GET");
         int code = conn.getResponseCode();
-        if (code != 200) throw new IOException("Download failed HTTP " + code);
+        if (code != 200) {
+            String body = "";
+            try { body = readAll(conn.getErrorStream()); } catch (Exception ignored) {}
+            throw new IOException("Download failed HTTP " + code + " body=" + body);
+        }
         try (InputStream in = conn.getInputStream(); FileOutputStream fos = new FileOutputStream(outFile)) {
             byte[] buf = new byte[8192];
             int r;
