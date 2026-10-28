@@ -160,6 +160,14 @@ public final class KioskHelper {
                 AppLog.w("KioskHelper", "Could not set status bar", se);
             }
 
+            // Home and Recents stay disabled in lock task; only the power menu is allowed
+            // (same as the system default, set explicitly so nothing else can enable them).
+            try {
+                dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS);
+            } catch (SecurityException se) {
+                AppLog.w("KioskHelper", "Could not set lock task features", se);
+            }
+
             activity.startLockTask();
             Log.d("KioskHelper", "Lock Task started");
 

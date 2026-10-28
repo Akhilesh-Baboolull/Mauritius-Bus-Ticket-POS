@@ -35,9 +35,11 @@ public final class UpdateInstaller {
         intent.putExtra("fromVersionCode", fromV);
         intent.putExtra("toVersionCode", toV);
 
+        // Must be MUTABLE: PackageInstaller adds EXTRA_STATUS / EXTRA_STATUS_MESSAGE to this intent.
+        // With FLAG_IMMUTABLE those extras are dropped and the receiver always saw status=1 (failure).
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
                 ctx, sessionId, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE
         );
 
         // So PackageReplacedReceiver can report INSTALL_SUCCESS when install actually succeeds (even if InstallResultReceiver got status=1 first)

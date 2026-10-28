@@ -23,6 +23,11 @@ public class InstallResultReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (intent == null || !intent.hasExtra(PackageInstaller.EXTRA_STATUS)) {
+            // No result from the system (e.g. an older install session); PackageReplacedReceiver reports success.
+            Log.w(TAG, "Install result without status; ignoring");
+            return;
+        }
         int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         String msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
 
@@ -40,7 +45,10 @@ public class InstallResultReceiver extends BroadcastReceiver {
             if (status == PackageInstaller.STATUS_SUCCESS) {
                 r.put("event", "INSTALL_SUCCESS");
                 Log.i(TAG, "Install success");
-                enqueueOnBackground(context, r, msg);
+                // Report once: whichever of this receiver / PackageReplacedReceiver runs first clears the context.
+                if (Prefs.getAndClearPendingInstallReportContext(context) != null) {
+                    enqueueOnBackground(context, r, msg);
+                }
                 Executors.newSingleThreadExecutor().execute(() ->
                         CrashLogger.logUpdateEvent(TAG, "INSTALL_SUCCESS"));
 
@@ -51,7 +59,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
                 // 2) Fallback: one-shot alarm to open app in 5s (in case this process is killed before the Handler runs)
                 scheduleRelaunchAlarm(appContext);
             } else {
-                // status=1 (STATUS_FAILURE) with empty message can occur on first attempt; retry may succeed (e.g. BTM04).
+                Prefs.getAndClearPendingInstallReportContext(context);
                 r.put("event", "INSTALL_FAILED");
                 r.put("errorCode", status);
                 if (msg != null) r.put("message", msg);

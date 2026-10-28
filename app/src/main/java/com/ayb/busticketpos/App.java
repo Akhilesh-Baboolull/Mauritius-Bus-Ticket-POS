@@ -45,6 +45,7 @@ public class App extends Application {
         }
 
         Log.d("App", "onCreate: main process — full init");
+        registerActivityLifecycleCallbacks(new KioskBackBlocker());
         MemoryWatchdog.init(this);
         Prefs.setLastAlive(this, System.currentTimeMillis());
 
