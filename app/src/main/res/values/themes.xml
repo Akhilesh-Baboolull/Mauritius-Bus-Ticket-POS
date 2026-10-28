@@ -25,7 +25,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_marginTop">24dp</item>
         <item name="android:paddingBottom">6dp</item>
-        <item name="android:textColor">#031FB8</item>
+        <item name="android:textColor">@color/ui_brand</item>
         <item name="android:textSize">20sp</item>
         <item name="android:textStyle">bold</item>
     </style>
@@ -35,7 +35,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:paddingTop">4dp</item>
         <item name="android:paddingBottom">4dp</item>
-        <item name="android:textColor">#000000</item>
+        <item name="android:textColor">@color/ui_text_primary</item>
         <item name="android:textSize">17sp</item>
     </style>
 
@@ -45,10 +45,277 @@
         <item name="android:visibility">gone</item>
     </style>
 
-    <style name="SettingsButton">
+    <style name="SettingsButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:minWidth">280dp</item>
+        <item name="android:layout_gravity">center_horizontal</item>
+        <item name="android:layout_marginTop">10dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/ui_surface</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="cornerRadius">@dimen/ui_corner</item>
+    </style>
+
+    <!-- Top-bar back button (Settings → Menu, Audit Log → Settings): outlined like BACK / MENU -->
+    <style name="TopBarBackButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/ui_text_body</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="strokeColor">@color/ui_border_strong</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="cornerRadius">@dimen/ui_corner</item>
+        <item name="icon">@drawable/ic_arrow_back_24</item>
+        <item name="iconTint">@color/ui_text_body</item>
+    </style>
+
+    <!-- Top-bar action button (e.g. Export CSV): same size as TopBarBackButton -->
+    <style name="TopBarActionButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/ui_surface</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="cornerRadius">@dimen/ui_corner</item>
+        <item name="iconTint">@color/ui_surface</item>
+    </style>
+
+    <!-- Settings dialogs (Register device / Admin Access) -->
+    <style name="SettingsDialogInput" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginTop">8dp</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
+        <item name="boxStrokeColor">#031FB8</item>
+        <item name="hintTextColor">#031FB8</item>
+        <item name="startIconTint">#6B6F76</item>
+        <item name="endIconTint">#6B6F76</item>
+    </style>
+
+    <style name="SettingsDialogInputText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">#1A1C1E</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <!-- Same size as AppDialogPrimaryButton; colour comes from the layout -->
+    <style name="SettingsDialogPrimaryButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:textStyle">bold</item>
         <item name="android:textColor">#FFFFFF</item>
+        <item name="cornerRadius">14dp</item>
+    </style>
+
+    <!-- Day / Trip flow screens -->
+    <style name="FlowTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/ui_text_primary</item>
+        <item name="android:textSize">@dimen/ui_text_title</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="FlowSubtitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/ui_text_secondary</item>
+        <item name="android:textSize">@dimen/ui_text_subtitle</item>
+    </style>
+
+    <style name="FlowPrimaryButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/ui_button_height</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/ui_surface</item>
+        <item name="android:textSize">@dimen/ui_text_button</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:elevation">3dp</item>
+        <item name="cornerRadius">@dimen/ui_corner</item>
+    </style>
+
+    <style name="FlowSecondaryButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/ui_button_height</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/ui_text_body</item>
+        <item name="android:textSize">@dimen/ui_text_button</item>
+        <item name="android:textStyle">bold</item>
+        <item name="strokeColor">@color/ui_border_strong</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="cornerRadius">@dimen/ui_corner</item>
+    </style>
+
+    <!-- Round < / > buttons beside the bus / route value -->
+    <style name="FlowArrowButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">72dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="backgroundTint">@color/flow_arrow_tint</item>
+        <item name="cornerRadius">36dp</item>
+        <item name="iconSize">44dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconTint">#FFFFFF</item>
+    </style>
+
+    <!-- Large value box between the arrows (bus number / route) -->
+    <style name="FlowValueBox">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">88dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:layout_marginEnd">12dp</item>
+        <item name="android:background">@drawable/bg_status_card</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textColor">#1A1C1E</item>
+        <item name="android:textSize">32sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Waybill amount fields -->
+    <style name="WaybillInput" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
+        <item name="boxStrokeColor">#031FB8</item>
+        <item name="hintTextColor">#031FB8</item>
+        <item name="prefixText">Rs </item>
+        <item name="prefixTextColor">#6B6F76</item>
+    </style>
+
+    <style name="WaybillInputText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:inputType">numberDecimal</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textColor">#1A1C1E</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Calculator: quick cash amounts -->
+    <style name="CalcQuickCashButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">60dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+        <item name="android:textColor">@color/ui_surface</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="backgroundTint">#3F51B5</item>
+        <item name="cornerRadius">14dp</item>
+    </style>
+
+    <!-- Report: selectable report-type cards (RadioButtons) -->
+    <style name="ReportOption">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">25dp</item>
+        <item name="android:minHeight">76dp</item>
+        <item name="android:background">@drawable/bg_option_card</item>
+        <item name="android:buttonTint">@color/ui_brand</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:textColor">@color/ui_text_primary</item>
+        <item name="android:textSize">@dimen/ui_text_option</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Menu action tiles (Day / Trip / Ticketing / Report) -->
+    <style name="MenuTile" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/ui_tile_height</item>
+        <item name="android:layout_marginTop">40dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:textAlignment">viewStart</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/ui_surface</item>
+        <item name="android:textSize">@dimen/ui_text_tile</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:elevation">3dp</item>
+        <item name="cornerRadius">18dp</item>
+        <item name="iconSize">72dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="iconGravity">start</item>
+    </style>
+
+    <!-- AppDialog (all app dialogs): larger touch targets for the POS screen -->
+    <style name="AppDialogPrimaryButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="backgroundTint">#031FB8</item>
+        <item name="cornerRadius">14dp</item>
+    </style>
+
+    <style name="AppDialogSecondaryButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:textColor">#44474E</item>
+        <item name="strokeColor">#C7CAD1</item>
+        <item name="cornerRadius">14dp</item>
+    </style>
+
+    <style name="SettingsDialogSecondaryButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:textColor">#44474E</item>
+        <item name="strokeColor">#C7CAD1</item>
+        <item name="cornerRadius">14dp</item>
     </style>
 </resources>

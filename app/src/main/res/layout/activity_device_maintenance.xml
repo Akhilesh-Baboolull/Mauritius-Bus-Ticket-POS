@@ -11,40 +11,73 @@
         android:id="@+id/panel_auth"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_margin="24dp"
-        android:background="#94948E"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="100dp"
+        android:layout_marginRight="20dp"
+        android:background="@drawable/bg_dialog_card"
+        android:elevation="8dp"
         android:orientation="vertical"
-        android:padding="32dp"
-        android:visibility="gone">
+        android:padding="24dp"
+        android:visibility="visible"
+        tools:visibility="visible">
 
         <ImageView
             android:id="@+id/imageView4"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="96dp"
+            android:importantForAccessibility="no"
             app:srcCompat="@mipmap/ayb_way_logo_foreground" />
+
+        <FrameLayout
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_icon_circle_blue">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_lock_24"
+                app:tint="#031FB8" />
+        </FrameLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
             android:gravity="center"
-            android:text="ACCESS SETTINGS"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
+            android:text="Access Settings"
+            android:textColor="@color/ui_text_primary"
+            android:textSize="@dimen/ui_text_title"
             android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/maintenance_password"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:ems="10"
-            android:hint="Password"
-            android:imeOptions="actionDone"
-            android:inputType="number"
-            android:minHeight="48dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#FFFFFF" />
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="Enter the settings PIN to continue."
+            android:textColor="#6B6F76"
+            android:textSize="15sp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_maintenance_password"
+            style="@style/SettingsDialogInput"
+            android:layout_marginTop="20dp"
+            android:hint="PIN"
+            app:endIconMode="password_toggle"
+            app:startIconDrawable="@drawable/ic_lock_24">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/maintenance_password"
+                style="@style/SettingsDialogInputText"
+                android:imeOptions="actionDone"
+                android:inputType="numberPassword" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
             android:id="@+id/tv_login_lockout"
@@ -52,39 +85,52 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:gravity="center"
-            android:textColor="#FFEB3B"
-            android:textSize="18sp"
+            android:textColor="#C62828"
+            android:textSize="17sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
-        <Button
-            android:id="@+id/btn_maintenance_unlock"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:backgroundTint="#031FB8"
-            android:text="Continue"
-            android:textColor="#FFFFFF" />
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/btn_maintenance_cancel_auth"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:backgroundTint="#F44336"
-            android:text="Back" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_maintenance_cancel_auth"
+                style="@style/SettingsDialogSecondaryButton"
+                android:text="Cancel" />
+
+            <Space
+                android:layout_width="12dp"
+                android:layout_height="0dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_maintenance_unlock"
+                style="@style/SettingsDialogPrimaryButton"
+                android:backgroundTint="#031FB8"
+                android:text="Continue" />
+        </LinearLayout>
     </LinearLayout>
 
     <ScrollView
         android:id="@+id/panel_tools"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="visible">
+        android:visibility="gone"
+        tools:visibility="gone">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="20dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_menu_top"
+                style="@style/TopBarBackButton"
+                android:layout_gravity="start"
+                android:text="MENU" />
 
             <ImageView
                 android:id="@+id/imageView2"
@@ -98,8 +144,8 @@
                 android:fontFamily="sans-serif"
                 android:gravity="center"
                 android:text="Settings"
-                android:textColor="#000000"
-                android:textSize="26sp"
+                android:textColor="@color/ui_text_primary"
+                android:textSize="@dimen/ui_text_title"
                 android:textStyle="bold" />
 
             <!-- App updates -->
@@ -172,6 +218,12 @@
                 style="@style/SettingsButton"
                 android:backgroundTint="#031FB8"
                 android:text="Send pending data now" />
+
+            <Button
+                android:id="@+id/btn_view_pending"
+                style="@style/SettingsButton"
+                android:backgroundTint="#455A64"
+                android:text="View pending items" />
 
             <Button
                 android:id="@+id/btn_clear_sync_queue"
@@ -251,10 +303,6 @@
                 style="@style/SettingsRow" />
 
             <TextView
-                android:id="@+id/tv_tenant_id"
-                style="@style/SettingsRow" />
-
-            <TextView
                 android:id="@+id/tv_feedback_number"
                 style="@style/SettingsRow" />
 
@@ -263,10 +311,31 @@
                 style="@style/SettingsRow" />
 
             <Button
-                android:id="@+id/btn_maintenance_back"
+                android:id="@+id/btn_register"
                 style="@style/SettingsButton"
+                android:backgroundTint="#031FB8"
+                android:text="Register" />
+
+            <TextView
+                style="@style/SettingsSectionTitle"
+                android:text="Administrator" />
+
+            <Button
+                android:id="@+id/btn_audit_log"
+                style="@style/SettingsButton"
+                android:backgroundTint="#455A64"
+                android:text="Audit Log" />
+
+            <Button
+                android:id="@+id/btn_exit_kiosk"
+                style="@style/SettingsButton"
+                android:backgroundTint="#F44336"
+                android:text="Admin Access" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_maintenance_back"
+                style="@style/FlowSecondaryButton"
                 android:layout_marginTop="28dp"
-                android:backgroundTint="#03A9F4"
                 android:text="MENU" />
         </LinearLayout>
     </ScrollView>

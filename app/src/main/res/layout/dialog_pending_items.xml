@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings → Pending uploads → View pending items -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_card"
+    android:orientation="vertical"
+    android:paddingLeft="12dp"
+    android:paddingTop="20dp"
+    android:paddingRight="12dp"
+    android:paddingBottom="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="Pending uploads"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_text_dialog_title"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tv_pending_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:text="Loading…"
+        android:textColor="@color/ui_text_secondary"
+        android:textSize="@dimen/ui_text_subtitle" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="560dp"
+        android:layout_marginTop="12dp">
+
+        <LinearLayout
+            android:id="@+id/pending_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_pending_close"
+            style="@style/AppDialogSecondaryButton"
+            android:text="Close" />
+    </LinearLayout>
+</LinearLayout>

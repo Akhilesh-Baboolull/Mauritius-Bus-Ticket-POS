@@ -1,3 +1,17 @@
 <resources>
     <dimen name="fab_margin">16dp</dimen>
+
+    <!-- Shared UI tokens for the redesigned screens -->
+    <dimen name="ui_text_title">34sp</dimen>
+    <dimen name="ui_text_dialog_title">24sp</dimen>
+    <dimen name="ui_text_subtitle">16sp</dimen>
+    <dimen name="ui_text_body">18sp</dimen>
+    <dimen name="ui_text_option">22sp</dimen>
+    <dimen name="ui_text_button">24sp</dimen>
+    <dimen name="ui_text_tile">26sp</dimen>
+    <dimen name="ui_screen_padding">24dp</dimen>
+    <dimen name="ui_button_height">76dp</dimen>
+    <dimen name="ui_tile_height">92dp</dimen>
+    <dimen name="ui_corner">18dp</dimen>
+    <dimen name="ui_logo_height">96dp</dimen>
 </resources>

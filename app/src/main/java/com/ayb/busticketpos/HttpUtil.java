@@ -103,8 +103,16 @@ public class HttpUtil {
         return postJson(urlStr, jsonBody, null);
     }
 
+    private static final int MAX_REDIRECTS = 5;
+
     /** POST JSON with optional headers (e.g. UpdateAuth.buildAuthHeaders for report/update endpoints). */
     public static String postJson(String urlStr, String jsonBody, Map<String, String> headers) throws IOException {
+        return postJson(urlStr, jsonBody, headers, 0);
+    }
+
+    private static String postJson(String urlStr, String jsonBody, Map<String, String> headers,
+                                   int redirects) throws IOException {
+        if (jsonBody == null) throw new IOException("POST body is null");
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         try {
@@ -137,7 +145,8 @@ public class HttpUtil {
             if (code == HttpURLConnection.HTTP_MOVED_PERM || code == HttpURLConnection.HTTP_MOVED_TEMP || code == 307 || code == 308) {
                 String loc = conn.getHeaderField("Location");
                 if (loc == null) throw new IOException("Redirect without Location header");
-                return postJson(loc, jsonBody, headers);
+                if (redirects >= MAX_REDIRECTS) throw new IOException("Too many redirects");
+                return postJson(loc, jsonBody, headers, redirects + 1);
             }
 
             InputStream is = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();

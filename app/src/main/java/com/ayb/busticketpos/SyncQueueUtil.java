@@ -36,7 +36,7 @@ public final class SyncQueueUtil {
             try {
                 AppDatabase.getInstance(app).syncJobDao().deleteAllByEndpoint(ApiEndpoints.POSITIONING);
             } catch (Exception e) {
-                Log.w(TAG, "Could not clear old positioning queue rows", e);
+                AppLog.w(TAG, "Could not clear old positioning queue rows", e);
             }
         }
 
@@ -56,7 +56,7 @@ public final class SyncQueueUtil {
                 final boolean urgent = scheduleDrain && !ApiEndpoints.POSITIONING.equals(endpointFinal);
                 SyncQueueMaintenance.runAfterEnqueue(app, scheduleDrain, urgent);
             } catch (Exception e) {
-                Log.e(TAG, "enqueue failed", e);
+                AppLog.e(TAG, "enqueue failed", e);
             }
         });
         return -1L;
@@ -82,7 +82,7 @@ public final class SyncQueueUtil {
             );
             Log.d(TAG, "Drain scheduled in " + delaySec + "s pending=" + pending);
         } catch (Exception e) {
-            Log.e(TAG, "requestDrain failed", e);
+            AppLog.e(TAG, "requestDrain failed", e);
         }
     }
 }

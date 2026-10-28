@@ -5,209 +5,185 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/ui_surface"
     tools:context=".Report">
 
+    <!-- Top logo -->
     <ImageView
         android:id="@+id/aybway_logo"
-        android:layout_width="253dp"
-        android:layout_height="165dp"
-        android:layout_marginStart="109dp"
-        android:layout_marginTop="15dp"
-        android:layout_marginEnd="109dp"
+        android:layout_width="118dp"
+        android:layout_height="116dp"
+        android:layout_marginTop="24dp"
+        android:adjustViewBounds="true"
         android:contentDescription="@string/aybway_logo"
+        android:src="@mipmap/ayb_way_logo_foreground"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@mipmap/ayb_way_logo_foreground"
-        tools:ignore="ImageContrastCheck" />
+        app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- ① Choose report -->
     <LinearLayout
         android:id="@+id/main_layout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_horizontal|center_vertical"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:orientation="vertical"
-        android:paddingLeft="40dp"
-        android:paddingRight="40dp"
+        android:paddingStart="@dimen/ui_screen_padding"
+        android:paddingEnd="@dimen/ui_screen_padding"
+        android:paddingBottom="@dimen/ui_screen_padding"
         android:visibility="visible"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/aybway_logo"
-        app:layout_constraintVertical_bias="0.307"
-        tools:layout_editor_absoluteX="0dp">
+        tools:visibility="visible">
 
-        <Button
+        <TextView
+            style="@style/FlowTitle"
+            android:layout_marginTop="28dp"
+            android:text="Reports"
+            android:textSize="34sp" />
+
+        <TextView
+            style="@style/FlowSubtitle"
+            android:text="Choose the report you want to print" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/trip_report"
-            android:layout_width="match_parent"
-            android:layout_height="150dp"
+            style="@style/MenuTile"
+            android:layout_height="110dp"
+            android:layout_marginTop="32dp"
             android:backgroundTint="#FF9800"
             android:text="@string/detailed_report"
-            android:textAlignment="textStart"
-            android:textSize="34sp"
-            app:cornerRadius="0dp"
-            app:icon="@mipmap/detailed_report_foreground"
-            app:iconPadding="0dp"
-            app:iconSize="110dp"
-            tools:ignore="TextSizeCheck,TextContrastCheck" />
+            app:icon="@mipmap/detailed_report_foreground" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/summary_report"
-            android:layout_width="match_parent"
-            android:layout_height="150dp"
-            android:layout_marginTop="50dp"
+            style="@style/MenuTile"
+            android:layout_height="110dp"
+            android:layout_marginTop="35dp"
             android:backgroundTint="#3F51B5"
-            android:text="SUMMARY REPORT"
-            android:textAlignment="textStart"
-            android:textSize="34sp"
-            app:cornerRadius="0dp"
-            app:icon="@mipmap/summary_report_foreground"
-            app:iconPadding="0dp"
-            app:iconSize="110dp"
-            tools:ignore="TextSizeCheck" />
+            android:text="@string/summary_report"
+            app:icon="@mipmap/summary_report_foreground" />
 
-        <Button
-            android:id="@+id/btn_back2"
+        <Space
             android:layout_width="match_parent"
-            android:layout_height="100dp"
-            android:layout_marginTop="50dp"
-            android:backgroundTint="#03A9F4"
-            android:text="@string/menu"
-            android:textSize="34sp"
-            app:cornerRadius="0dp"
-            tools:ignore="TextContrastCheck" />
+            android:layout_height="80dp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_back2"
+            style="@style/FlowSecondaryButton"
+            android:text="MENU" />
     </LinearLayout>
 
+    <!-- ② Detailed report: choose type -->
     <LinearLayout
         android:id="@+id/trip_report_layout"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingLeft="30dp"
-        android:paddingTop="20dp"
-        android:paddingRight="30dp"
+        android:paddingStart="@dimen/ui_screen_padding"
+        android:paddingEnd="@dimen/ui_screen_padding"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/aybway_logo"
-        app:layout_constraintVertical_bias="0.036"
-        tools:layout_editor_absoluteX="0dp">
+        tools:visibility="gone">
 
         <TextView
             android:id="@+id/textView11"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/trip_report"
-            android:textAlignment="center"
-            android:textSize="34sp"
-            android:textStyle="bold" />
+            style="@style/FlowTitle"
+            android:layout_marginTop="28dp"
+            android:text="Detailed Report" />
 
         <TextView
             android:id="@+id/textView12"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/select_report_type"
-            android:textAlignment="center"
-            android:textSize="24sp" />
+            style="@style/FlowSubtitle"
+            android:text="Select which trips to include" />
 
         <RadioGroup
             android:id="@+id/report_type"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp">
+            android:layout_marginTop="20dp">
 
             <RadioButton
                 android:id="@+id/radioButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                style="@style/ReportOption"
+                android:layout_marginTop="0dp"
                 android:tag="current_trip"
-                android:text="@string/current_trip"
-                android:textSize="24sp" />
+                android:text="@string/current_trip" />
 
             <RadioButton
                 android:id="@+id/radioButton2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                style="@style/ReportOption"
                 android:tag="all_trips"
-                android:text="@string/all_trips"
-                android:textSize="24sp" />
+                android:text="@string/all_trips" />
 
             <RadioButton
                 android:id="@+id/radioButton3"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                style="@style/ReportOption"
                 android:tag="custom_trip"
-                android:text="@string/custom_trip"
-                android:textSize="24sp" />
+                android:text="@string/custom_trip" />
         </RadioGroup>
     </LinearLayout>
 
+    <!-- ③ Print actions (shown once a report type is selected) -->
     <LinearLayout
         android:id="@+id/layout_print"
-        android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:gravity="center_vertical"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingLeft="50dp"
-        android:paddingRight="50dp"
+        android:paddingStart="@dimen/ui_screen_padding"
+        android:paddingEnd="@dimen/ui_screen_padding"
+        android:paddingBottom="@dimen/ui_screen_padding"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/trip_report_layout"
-        tools:layout_editor_absoluteX="31dp">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:visibility="gone">
 
         <TextView
             android:id="@+id/selected_trip"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textAlignment="center"
-            android:textColor="#000000"
-            android:textSize="30sp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center"
+            android:textColor="@color/ui_brand"
+            android:textSize="@dimen/ui_text_option"
             android:textStyle="bold" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_print"
-            android:layout_width="match_parent"
-            android:layout_height="100dp"
-            android:layout_marginTop="20dp"
-            android:backgroundTint="#4CAF50"
-            android:text="@string/print_report"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            style="@style/FlowPrimaryButton"
+            android:backgroundTint="@color/ui_success"
+            android:text="PRINT REPORT" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_back1"
-            android:layout_width="match_parent"
-            android:layout_height="100dp"
-            android:layout_marginTop="30dp"
-            android:backgroundTint="#FF0000"
-            android:text="@string/back"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            style="@style/FlowSecondaryButton"
+            android:layout_marginTop="20dp"
+            android:text="BACK" />
     </LinearLayout>
 
+    <!-- ③ Back only (before a report type is selected) -->
     <LinearLayout
         android:id="@+id/layout_back"
-        android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:gravity="center_horizontal|center_vertical"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingLeft="50dp"
-        android:paddingRight="50dp"
+        android:paddingStart="@dimen/ui_screen_padding"
+        android:paddingEnd="@dimen/ui_screen_padding"
+        android:paddingBottom="@dimen/ui_screen_padding"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/trip_report_layout"
-        app:layout_constraintVertical_bias="0.308"
-        tools:layout_editor_absoluteX="0dp">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:visibility="gone">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_back3"
-            android:layout_width="match_parent"
-            android:layout_height="100dp"
-            android:layout_marginTop="30dp"
-            android:backgroundTint="#FF0000"
-            android:text="@string/back"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            style="@style/FlowSecondaryButton"
+            android:text="BACK" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

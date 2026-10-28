@@ -19,7 +19,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.text.SimpleDateFormat;
@@ -145,13 +144,13 @@ public class Trip extends AppCompatActivity {
 
                                 @Override
                                 public void onFail(String reason) {
-                                    Log.e("Trip", "Trip sync failed: " + reason);
+                                    AppLog.e("Trip", "Trip sync failed: " + reason);
                                 }
                             }
                     );
 
                 } catch (Exception e) {
-                    Log.e("Trip", "Error ending trip", e);
+                    AppLog.e("Trip", "Error ending trip", e);
                     runOnUiThread(() -> {
                         startActivity(new Intent(Trip.this, Menu.class)
                                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
@@ -165,7 +164,7 @@ public class Trip extends AppCompatActivity {
 
     /** Step A: Load routes and wire the route-chooser UI (no Prefs writes here) */
     private void initializeRouteSelection() {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             List<RouteEntity> routes = AppDatabase
                     .getInstance(getApplicationContext())
                     .routeDao()
@@ -178,7 +177,7 @@ public class Trip extends AppCompatActivity {
             String saved = Prefs.getSelectedRoute(this);
             if (saved != null) {
                 for (int i = 0; i < routeList.size(); i++) {
-                    if (routeList.get(i).routeId.equals(saved)) {
+                    if (saved.equals(routeList.get(i).routeId)) {
                         currentRouteIndex = i;
                         break;
                     }
@@ -206,86 +205,17 @@ public class Trip extends AppCompatActivity {
 
                     String today = new SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(new Date());
 
-                    if(!Prefs.getDayDate(this).equals(today)){
-                        String msg = "Day Expired! End Current Day and Start a New One";
-                        SpannableString sizedMsg = new SpannableString(msg);
-                        // the second parameter "true" means "treat the 18 as SP, not pixels"
-                        sizedMsg.setSpan(
-                                new AbsoluteSizeSpan(28, true),  // 18sp text size
-                                0,                                // start
-                                msg.length(),                     // end
-                                Spannable.SPAN_INCLUSIVE_INCLUSIVE
-                        );
-                        sizedMsg.setSpan(
-                                new AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER),
-                                0, msg.length(),
-                                Spanned.SPAN_INCLUSIVE_INCLUSIVE
-                        );
-
-                        AlertDialog dialog = new AlertDialog.Builder(Trip.this)
-                                .setMessage(sizedMsg)
-                                .setPositiveButton("OK", null)
+                    if(!today.equals(Prefs.getDayDate(this))){
+                        AppDialog.with(Trip.this)
+                                .type(AppDialog.Type.WARNING)
+                                .title("Day Expired!")
+                                .message("End Current Day and Start a New One")
+                                .positive("OK", () -> {
+                                    startActivity(new Intent(Trip.this, Menu.class));
+                                    finish();
+                                })
+                                .cancelable(false)
                                 .show();
-
-                        // 🚫 Prevent dismiss when touching outside or pressing Back
-                        dialog.setCanceledOnTouchOutside(false);
-                        dialog.setCancelable(false);
-
-                        Button okButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-
-                        // • Increase text size to 20sp
-                        okButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-
-                        // • Change text color to white (for contrast)
-                        okButton.setTextColor(Color.WHITE);
-
-                        // • Paint its background blue
-                        okButton.setBackgroundColor(Color.BLUE);
-
-                        // (Optional) If you want rounded corners or padding:
-                        int pad = (int) TypedValue.applyDimension(
-                                TypedValue.COMPLEX_UNIT_DIP, 20, getResources().getDisplayMetrics()
-                        );
-                        okButton.setPadding(pad, pad, pad, pad);
-                        okButton.setAllCaps(false);
-                        LinearLayout parent = (LinearLayout) okButton.getParent();
-                        parent.setGravity(Gravity.CENTER);
-
-                        // (Optional) If you want the button to stretch across and then center its text:
-                        LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) okButton.getLayoutParams();
-                        params.width = LinearLayout.LayoutParams.MATCH_PARENT;
-                        okButton.setLayoutParams(params);
-                        okButton.setGravity(Gravity.CENTER);
-
-                        TextView messageView = dialog.findViewById(android.R.id.message);
-                        if (messageView != null) {
-                            // 3️⃣ convert 16dp to pixels
-                            int extraPx = (int) TypedValue.applyDimension(
-                                    TypedValue.COMPLEX_UNIT_DIP,
-                                    16,
-                                    getResources().getDisplayMetrics()
-                            );
-
-                            // 4️⃣ add it to the bottom padding
-                            messageView.setPadding(
-                                    messageView.getPaddingLeft(),
-                                    messageView.getPaddingTop(),
-                                    messageView.getPaddingRight(),
-                                    messageView.getPaddingBottom() + extraPx
-                            );
-                        }
-
-                        dialog.getWindow().setBackgroundDrawable(
-                                new ColorDrawable(Color.parseColor("#FFAA00"))
-                        );
-
-                        // ✅ Add click listener for OK button
-                        okButton.setOnClickListener(view -> {
-                            // Example: Redirect to Menu Activity
-                             Intent i = new Intent(Trip.this, Menu.class);
-                             startActivity(i);
-                             finish();
-                        });
 
 
                     }
@@ -305,7 +235,7 @@ public class Trip extends AppCompatActivity {
         directionValue = 0;
         String SelectedDirection = "";
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             List<StageEntity> stages = AppDatabase
                     .getInstance(getApplicationContext())
                     .stageDao()

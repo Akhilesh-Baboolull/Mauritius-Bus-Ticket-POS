@@ -190,13 +190,18 @@ public class Calculator extends AppCompatActivity {
                 last = ticketDao.getLastTickets(10, current_dayId);
             } catch (Throwable e) {
                 // fallback if query not yet added (won't crash)
-                TripEntity lastTrip = ticketDao.getLastTrip();
-                if (lastTrip == null) last = new ArrayList<>();
-                else {
-                    List<TicketEntity> allTripTickets = ticketDao.getTicketsForTrip(lastTrip.tripId);
-                    // take last 10 from trip list (assuming order by insertion)
-                    int start = Math.max(0, allTripTickets.size() - 10);
-                    last = allTripTickets.subList(start, allTripTickets.size());
+                try {
+                    TripEntity lastTrip = ticketDao.getLastTrip();
+                    if (lastTrip == null) last = new ArrayList<>();
+                    else {
+                        List<TicketEntity> allTripTickets = ticketDao.getTicketsForTrip(lastTrip.tripId);
+                        // take last 10 from trip list (assuming order by insertion)
+                        int start = Math.max(0, allTripTickets.size() - 10);
+                        last = allTripTickets.subList(start, allTripTickets.size());
+                    }
+                } catch (Throwable fallbackError) {
+                    AppLog.e("Calculator", "Could not load last tickets", fallbackError);
+                    last = new ArrayList<>();
                 }
             }
 
@@ -213,7 +218,9 @@ public class Calculator extends AppCompatActivity {
             }
 
             final List<TicketEntity> finalLast = last;
-            runOnUiThread(() -> adapter.setData(finalLast));
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) adapter.setData(finalLast);
+            });
         });
     }
 

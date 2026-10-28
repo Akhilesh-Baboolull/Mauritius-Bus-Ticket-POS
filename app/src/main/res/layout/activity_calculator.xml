@@ -5,188 +5,149 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/ui_surface"
     android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="20dp"
     tools:context=".Calculator">
+
+    <TextView
+        android:id="@+id/textView2"
+        style="@style/FlowTitle"
+        android:text="Change Calculator" />
+
+    <!-- Money received + clear -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/WaybillInput"
+            android:hint="Money received">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/money_received"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionDone"
+                android:importantForAutofill="no"
+                android:inputType="number"
+                android:singleLine="true"
+                android:textColor="@color/ui_text_primary"
+                android:textSize="@dimen/ui_text_button"
+                android:textStyle="bold" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_clear"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="4dp"
+            android:backgroundTint="#EDA034"
+            android:contentDescription="Clear Button"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            app:cornerRadius="14dp"
+            app:icon="@android:drawable/ic_menu_delete"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconSize="34dp"
+            app:iconTint="#1A1C1E" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/textView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="Quick cash"
+        android:textColor="@color/ui_text_secondary"
+        android:textSize="@dimen/ui_text_subtitle"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingLeft="20dp"
-        android:paddingTop="20dp"
-        android:paddingRight="20dp"
-        android:paddingBottom="20dp">
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/textView2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="CHANGE CALCULATOR"
-            android:textAlignment="center"
-            android:textSize="34sp"
-            android:textStyle="bold" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/quick_100"
+            style="@style/CalcQuickCashButton"
+            android:text="100" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="clip_horizontal|center_vertical"
-            android:orientation="horizontal">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/quick_200"
+            style="@style/CalcQuickCashButton"
+            android:layout_marginStart="8dp"
+            android:text="200" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:layout_marginRight="10dp"
-                android:layout_weight="1"
-                android:gravity="center_vertical">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/quick_250"
+            style="@style/CalcQuickCashButton"
+            android:layout_marginStart="8dp"
+            android:text="250" />
 
-                <EditText
-                    android:id="@+id/money_received"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_vertical"
-                    android:hint="MONEY RECEIVED"
-                    android:imeOptions="actionDone"
-                    android:importantForAutofill="no"
-                    android:inputType="number"
-                    android:singleLine="true"
-                    android:textAlignment="center"
-                    android:textColorHint="#A1887F"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/quick_500"
+            style="@style/CalcQuickCashButton"
+            android:layout_marginStart="8dp"
+            android:text="500" />
+    </LinearLayout>
 
-            </com.google.android.material.textfield.TextInputLayout>
+    <!-- Last 10 tickets: tap to add / remove -->
+    <TextView
+        android:id="@+id/last_tickets_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="Last 10 tickets · tap to select"
+        android:textColor="@color/ui_text_secondary"
+        android:textSize="@dimen/ui_text_subtitle"
+        android:textStyle="bold" />
 
-            <Button
-                android:id="@+id/btn_clear"
-                android:layout_width="80dp"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:layout_marginLeft="10dp"
-                android:backgroundTint="#EDA034"
-                android:contentDescription="Clear Button"
-                android:gravity="center_horizontal|center_vertical"
-                android:paddingLeft="0dp"
-                android:paddingTop="0dp"
-                android:paddingRight="0dp"
-                android:paddingBottom="0dp"
-                android:textColor="#000000"
-                android:textSize="14sp"
-                app:cornerRadius="10dp"
-                app:icon="@android:drawable/ic_menu_delete"
-                app:iconGravity="textStart"
-                app:iconPadding="0dp"
-                app:iconSize="30sp" />
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_last_tickets"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="6dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_recycler_border"
+        android:clipToPadding="false"
+        android:minHeight="160dp"
+        android:padding="5dp"
+        tools:listitem="@layout/item_last_ticket" />
 
-        </LinearLayout>
+    <!-- Selected amounts (chips) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/textView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Quick Cash:"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/quick_100"
-                android:layout_width="90dp"
-                android:layout_height="50dp"
-                android:backgroundTint="#3F51B5"
-                android:text="100"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
-
-            <Button
-                android:id="@+id/quick_200"
-                android:layout_width="90dp"
-                android:layout_height="50dp"
-                android:layout_marginLeft="10dp"
-                android:backgroundTint="#3F51B5"
-                android:text="200"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
-
-            <Button
-                android:id="@+id/quick_250"
-                android:layout_width="90dp"
-                android:layout_height="50dp"
-                android:layout_marginLeft="10dp"
-                android:backgroundTint="#3F51B5"
-                android:text="250"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
-
-            <Button
-                android:id="@+id/quick_500"
-                android:layout_width="90dp"
-                android:layout_height="50dp"
-                android:layout_marginLeft="10dp"
-                android:backgroundTint="#3F51B5"
-                android:text="500"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
-        </LinearLayout>
-
-        <!-- ========================= -->
-        <!-- TICKET SELECTOR (LAST 10) -->
-        <!-- ========================= -->
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/last_tickets_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="LAST 10 TICKETS"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_last_tickets"
-            android:layout_width="match_parent"
-            android:layout_height="230dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_recycler_border"
-            android:paddingLeft="5dp"
-            android:paddingTop="5dp"
-            android:paddingRight="5dp"
-            android:paddingBottom="5dp"
-            tools:listitem="@layout/item_last_ticket" />
-
-        <!-- Selected amounts (chips) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="Selected:"
-            android:textSize="16sp"
+            android:layout_marginEnd="8dp"
+            android:text="Selected"
+            android:textColor="@color/ui_text_secondary"
+            android:textSize="@dimen/ui_text_subtitle"
             android:textStyle="bold" />
 
         <HorizontalScrollView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:minHeight="50dp"
+            android:layout_weight="1"
             android:scrollbars="none">
 
             <com.google.android.material.chip.ChipGroup
@@ -195,54 +156,45 @@
                 android:layout_height="wrap_content"
                 app:chipSpacingHorizontal="6dp"
                 app:singleLine="true" />
-
         </HorizontalScrollView>
-
-        <!-- TOTAL -->
-        <TextView
-            android:id="@+id/tv_total"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="TOTAL: Rs 0"
-            android:textAlignment="center"
-            android:textSize="26sp"
-            android:textStyle="bold" />
-
-        <!-- CHANGE -->
-        <TextView
-            android:id="@+id/tv_change"
-            android:layout_width="350dp"
-            android:layout_height="60dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="6dp"
-            android:background="#00BCD4"
-            android:gravity="center_vertical"
-            android:text="CHANGE: Rs 0"
-            android:textAlignment="center"
-            android:textColor="#FFFFFF"
-            android:textSize="26sp"
-            android:textStyle="bold"
-            tools:ignore="TextContrastCheck" />
-
     </LinearLayout>
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tv_total"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingLeft="20dp"
-        android:paddingRight="20dp">
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:text="TOTAL: Rs 0"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_text_tile"
+        android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/btn_back"
-            android:layout_width="350dp"
-            android:layout_height="wrap_content"
-            android:backgroundTint="#FF0000"
-            android:text="Back"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
-    </LinearLayout>
+    <!-- Change: Calculator.java sets the colour; the frame keeps the corners rounded -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_calc_change_frame"
+        android:clipToOutline="true">
+
+        <TextView
+            android:id="@+id/tv_change"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#00BCD4"
+            android:gravity="center"
+            android:text="CHANGE: Rs 0"
+            android:textColor="#FFFFFF"
+            android:textSize="@dimen/ui_text_button"
+            android:textStyle="bold"
+            tools:ignore="TextContrastCheck" />
+    </FrameLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_back"
+        style="@style/FlowSecondaryButton"
+        android:layout_marginTop="14dp"
+        android:text="BACK" />
 
 </LinearLayout>

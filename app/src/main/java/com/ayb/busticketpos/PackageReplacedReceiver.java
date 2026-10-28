@@ -21,7 +21,15 @@ public class PackageReplacedReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) return;
+        try {
+            handle(context, intent);
+        } catch (Throwable t) {
+            AppLog.e(TAG, "onReceive failed", t);
+        }
+    }
+
+    private void handle(Context context, Intent intent) {
+        if (intent == null || !Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) return;
         Prefs.getAndClearPendingRelaunchAfterUnlock(context); // clear so UnlockReceiver doesn't relaunch again
 
         // Report INSTALL_SUCCESS to server (we know the package was replaced); corrects spurious INSTALL_FAILED from InstallResultReceiver
@@ -42,7 +50,7 @@ public class PackageReplacedReceiver extends BroadcastReceiver {
                     SyncQueueUtil.enqueue(appContext, ApiEndpoints.REPORT_URL, r, null);
                     Log.i(TAG, "Reported INSTALL_SUCCESS to server (releaseId=" + releaseId + ")");
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to report INSTALL_SUCCESS", e);
+                    AppLog.e(TAG, "Failed to report INSTALL_SUCCESS", e);
                 }
             });
         }
@@ -53,7 +61,7 @@ public class PackageReplacedReceiver extends BroadcastReceiver {
             context.startActivity(launch);
             Log.i(TAG, "App relaunched after package replace");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to relaunch after update", e);
+            AppLog.e(TAG, "Failed to relaunch after update", e);
         }
     }
 }

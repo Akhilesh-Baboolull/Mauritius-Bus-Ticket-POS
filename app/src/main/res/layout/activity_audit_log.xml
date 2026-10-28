@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F6F8"
+    android:orientation="vertical"
+    android:padding="16dp"
+    tools:context=".AuditLogActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_audit_back"
+            style="@style/TopBarBackButton"
+            android:text="SETTINGS" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_audit_export"
+            style="@style/TopBarActionButton"
+            android:backgroundTint="@color/ui_success"
+            android:text="Export CSV"
+            app:icon="@drawable/ic_download_24" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Audit Log"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_text_title"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/audit_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Settings activity and app errors from the last 10 days"
+        android:textColor="@color/ui_text_secondary"
+        android:textSize="@dimen/ui_text_subtitle" />
+
+    <!-- Keyword search -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/til_audit_search"
+        style="@style/SettingsDialogInput"
+        android:layout_marginTop="10dp"
+        android:hint="Search (e.g. printer, login, sync)"
+        app:endIconMode="clear_text"
+        app:startIconDrawable="@drawable/ic_search_24">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/audit_search"
+            style="@style/SettingsDialogInputText"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Source: all / Settings actions / app errors -->
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/audit_filter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        app:checkedChip="@+id/chip_all"
+        app:selectionRequired="true"
+        app:singleSelection="true">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_all"
+            style="@style/Widget.MaterialComponents.Chip.Choice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="All"
+            android:textSize="15sp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_settings"
+            style="@style/Widget.MaterialComponents.Chip.Choice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Settings"
+            android:textSize="15sp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_app"
+            style="@style/Widget.MaterialComponents.Chip.Choice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="App errors"
+            android:textSize="15sp" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <!-- Category: none selected = show every category -->
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/audit_category_filter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
+        app:singleSelection="false">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_info"
+            style="@style/Widget.MaterialComponents.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Info"
+            android:textSize="15sp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_warning"
+            style="@style/Widget.MaterialComponents.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Warning"
+            android:textSize="15sp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_error"
+            style="@style/Widget.MaterialComponents.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Error"
+            android:textSize="15sp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_critical"
+            style="@style/Widget.MaterialComponents.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Critical"
+            android:textSize="15sp" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/audit_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false" />
+
+        <TextView
+            android:id="@+id/audit_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:text="No matching activity in the last 10 days"
+            android:textColor="#6B6F76"
+            android:textSize="16sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

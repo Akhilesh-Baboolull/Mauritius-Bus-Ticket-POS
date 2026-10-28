@@ -11,6 +11,21 @@
     <color name="stud_tab_selected_bg">#0E05DC</color>
     <color name="child_tab_selected_bg">#9AFF02A6</color>
 
+    <!-- Shared UI tokens for the redesigned screens (Menu, Day, Trip, Report, Settings, dialogs) -->
+    <color name="ui_brand">#031FB8</color>
+    <color name="ui_brand_light">#E6E9FB</color>
+    <color name="ui_text_primary">#1A1C1E</color>
+    <color name="ui_text_body">#44474E</color>
+    <color name="ui_text_secondary">#6B6F76</color>
+    <color name="ui_surface">#FFFFFF</color>
+    <color name="ui_surface_muted">#F5F7FA</color>
+    <color name="ui_border">#E3E5EA</color>
+    <color name="ui_border_strong">#C7CAD1</color>
+    <color name="ui_success">#2B9B06</color>
+    <color name="ui_warning">#E65100</color>
+    <color name="ui_danger">#D32F2F</color>
+    <color name="ui_menu_blue">#03A9F4</color>
+
     <color name="selected_tariff_row">#2196F3</color>
     <color name="fare_button_default">#3888FD</color>
     <color name="fare_button_selected">#FF0101</color>

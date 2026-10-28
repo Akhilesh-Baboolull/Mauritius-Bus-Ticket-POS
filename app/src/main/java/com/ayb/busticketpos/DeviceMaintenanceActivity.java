@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Bundle;
@@ -14,6 +16,8 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -23,11 +27,16 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDialog;
 import androidx.core.content.ContextCompat;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputLayout;
+
+import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -41,6 +50,8 @@ import java.util.Locale;
 public class DeviceMaintenanceActivity extends AppCompatActivity {
 
     private static final String ADMIN_PASSWORD = "0000";
+    /** Second password for registration and exiting kiosk mode (same as the old Menu panels). */
+    private static final String REGISTER_PASSWORD = "AYB%0000";
     private static final long REFRESH_INTERVAL_MS = 2000L;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final long LOCKOUT_MS = 5L * 60 * 1000;
@@ -48,12 +59,13 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
     private View panelAuth;
     private View panelTools;
     private EditText maintenancePassword;
+    private TextInputLayout tilMaintenancePassword;
 
     private TextView tvInstalledVersion, tvLastUpdateCheck, tvLastUpdateResult, tvUpdateAvailable, tvUpdateProgress;
     private TextView tvMasterLastFetch, tvMasterCounts, tvMasterProgress;
     private TextView queueStatusText, tvLastUpload, tvUploadProgress;
     private TextView tvInternet, tvBattery, tvDayTrip;
-    private TextView tvBtmId, tvCompany, tvTenantId, tvFeedbackNumber, tvServer;
+    private TextView tvBtmId, tvCompany, tvFeedbackNumber, tvServer;
     private Button btnCheckUpdates, btnInstallNow, btnSyncMaster, btnSendPending;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -93,6 +105,10 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         panelAuth = findViewById(R.id.panel_auth);
         panelTools = findViewById(R.id.panel_tools);
         maintenancePassword = findViewById(R.id.maintenance_password);
+        tilMaintenancePassword = findViewById(R.id.til_maintenance_password);
+        // Always start at the PIN; status rows are only filled after a successful unlock.
+        panelAuth.setVisibility(View.VISIBLE);
+        panelTools.setVisibility(View.GONE);
 
         tvInstalledVersion = findViewById(R.id.tv_installed_version);
         tvLastUpdateCheck = findViewById(R.id.tv_last_update_check);
@@ -110,7 +126,6 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         tvDayTrip = findViewById(R.id.tv_day_trip);
         tvBtmId = findViewById(R.id.tv_btm_id);
         tvCompany = findViewById(R.id.tv_company);
-        tvTenantId = findViewById(R.id.tv_tenant_id);
         tvFeedbackNumber = findViewById(R.id.tv_feedback_number);
         tvServer = findViewById(R.id.tv_server);
 
@@ -133,7 +148,15 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         });
         findViewById(R.id.btn_maintenance_cancel_auth).setOnClickListener(v -> finish());
         findViewById(R.id.btn_maintenance_back).setOnClickListener(v -> finish());
+        findViewById(R.id.btn_menu_top).setOnClickListener(v -> finish());
         findViewById(R.id.btn_clear_sync_queue).setOnClickListener(v -> confirmClearQueue());
+        findViewById(R.id.btn_view_pending).setOnClickListener(v -> showPendingItemsDialog());
+        findViewById(R.id.btn_register).setOnClickListener(v -> showRegisterDialog());
+        findViewById(R.id.btn_exit_kiosk).setOnClickListener(v -> showExitKioskDialog());
+        findViewById(R.id.btn_audit_log).setOnClickListener(v -> {
+            SettingsAudit.log(this, SettingsAudit.Event.AUDIT_LOG_VIEWED);
+            startActivity(new Intent(this, AuditLogActivity.class));
+        });
 
         btnCheckUpdates.setOnClickListener(v -> checkForUpdates());
         btnInstallNow.setOnClickListener(v -> confirmInstallNow());
@@ -180,6 +203,8 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         Prefs.setSettingsFailedLogins(this, 0);
         Prefs.setSettingsLockedUntil(this, 0L);
         handler.removeCallbacks(lockoutTick);
+        SettingsAudit.log(this, SettingsAudit.Event.LOGIN_SUCCESS);
+        tilMaintenancePassword.setError(null);
         hideKeyboard();
         maintenancePassword.setText("");
         unlocked = true;
@@ -206,7 +231,18 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
             Prefs.setSettingsLockedUntil(this, lockedUntil);
         }
 
-        SyncClient.reportSettingsFailedLogin(this, attempts, lock, lockedUntil);
+        String description = "Wrong PIN (attempt " + attempts + ")"
+                + (lock ? ", settings locked for " + (LOCKOUT_MS / 60000) + " minutes" : "");
+        JSONObject details = new JSONObject();
+        try {
+            details.put("attempt_no", attempts)
+                    .put("locked", lock)
+                    .put("locked_until", lock
+                            ? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date(lockedUntil))
+                            : JSONObject.NULL);
+        } catch (Exception ignored) {
+        }
+        SettingsAudit.log(this, SettingsAudit.Event.LOGIN_FAILED, description, details);
 
         if (lock) {
             hideKeyboard();
@@ -214,8 +250,7 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
             handler.post(lockoutTick);
         } else {
             int left = MAX_FAILED_ATTEMPTS - (attempts % MAX_FAILED_ATTEMPTS);
-            Toast.makeText(this, "Wrong PIN. " + left + " attempt(s) left before lock.",
-                    Toast.LENGTH_SHORT).show();
+            tilMaintenancePassword.setError("Wrong PIN. " + left + " attempt(s) left before lock.");
         }
     }
 
@@ -241,8 +276,10 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         long remaining = remainingLockoutMs();
         boolean locked = remaining > 0;
         maintenancePassword.setEnabled(!locked);
+        tilMaintenancePassword.setEnabled(!locked);
         btnUnlock.setEnabled(!locked);
         if (locked) {
+            tilMaintenancePassword.setError(null);
             long totalSec = (remaining + 999) / 1000;
             tvLoginLockout.setText(String.format(Locale.US,
                     "Too many failed attempts.\nTry again in %d:%02d", totalSec / 60, totalSec % 60));
@@ -312,7 +349,6 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
     private void fillAbout() {
         tvBtmId.setText("BTM ID: " + orDash(PrefsSecure.getMachineId(this)));
         tvCompany.setText("Registered company: " + orDash(PrefsSecure.getTenantName(this)));
-        tvTenantId.setText("Tenant ID: " + orDash(PrefsSecure.getTenantId(this)));
         tvFeedbackNumber.setText("Ticket feedback number: " + orDash(PrefsSecure.getFeedbackNumber(this)));
         String host = Uri.parse(ApiEndpoints.BASE).getHost();
         tvServer.setText("Server: " + orDash(host));
@@ -350,6 +386,7 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         }
         showStatus(tvUpdateProgress, "Checking with server…");
         UpdateScheduler.enqueueCheckOnly(this, false);
+        SettingsAudit.log(this, SettingsAudit.Event.UPDATE_CHECK_REQUESTED);
     }
 
     private void confirmInstallNow() {
@@ -358,15 +395,20 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
             return;
         }
         String name = Prefs.getUpdateAvailableVersionName(this);
-        new AlertDialog.Builder(this)
-                .setTitle("Install update now?")
-                .setMessage("Version " + (name != null ? name : "")
+        AppDialog.with(this)
+                .type(AppDialog.Type.QUESTION)
+                .title("Install update now?")
+                .message("Version " + (name != null ? name : "")
                         + " will be downloaded and installed. The app restarts when it finishes.")
-                .setPositiveButton("Install", (d, w) -> {
+                .negative("Cancel", null)
+                .positive("Install", () -> {
                     showStatus(tvUpdateProgress, "Downloading and installing update…");
                     UpdateScheduler.enqueueInstallNow(this);
+                    SettingsAudit.log(this, SettingsAudit.Event.UPDATE_INSTALL_REQUESTED,
+                            "Version " + (name != null ? name : "")
+                                    + " (" + Prefs.getUpdateAvailableVersionCode(this) + ")");
                 })
-                .setNegativeButton("Cancel", null)
+                .positiveColor(android.graphics.Color.parseColor("#2B9B06"))
                 .show();
     }
 
@@ -391,6 +433,12 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
             showStatus(tvMasterProgress, success
                     ? "Routes & fares updated"
                     : "Sync failed, existing routes & fares kept" + (message != null ? " (" + message + ")" : ""));
+            if (success) {
+                SettingsAudit.log(this, SettingsAudit.Event.MASTER_SYNC_SUCCESS);
+            } else {
+                SettingsAudit.log(this, SettingsAudit.Event.MASTER_SYNC_FAILED,
+                        message != null ? message : "Unknown error");
+            }
             if (unlocked) refreshAll();
         });
     }
@@ -430,6 +478,8 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 applySystemBrightness(dpm, seekBar.getProgress());
+                SettingsAudit.log(DeviceMaintenanceActivity.this, SettingsAudit.Event.BRIGHTNESS_CHANGED,
+                        "Set to " + brightnessPercent(seekBar.getProgress()) + "%");
             }
         });
     }
@@ -481,14 +531,110 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         showStatus(tvUploadProgress, "Sending pending data…");
         final Context app = getApplicationContext();
         AppExecutors.runBg(() -> SyncQueueUtil.requestDrain(app, true));
+        SettingsAudit.log(this, SettingsAudit.Event.PENDING_UPLOAD_REQUESTED);
+    }
+
+    private static final int PENDING_VIEW_LIMIT = 200;
+
+    /** Scrollable list of what is waiting in sync_queue (newest first). Tap a row for the full payload. */
+    private void showPendingItemsDialog() {
+        // Local only: sending this online could itself add a row to the queue being inspected.
+        SettingsAudit.log(this, SettingsAudit.Event.PENDING_ITEMS_VIEWED, null, null, false);
+
+        View content = getLayoutInflater().inflate(R.layout.dialog_pending_items, null);
+        TextView summary = content.findViewById(R.id.tv_pending_summary);
+        ViewGroup container = content.findViewById(R.id.pending_container);
+        AppCompatDialog dialog = AppDialog.wrap(this, content, 0.95f);
+        content.findViewById(R.id.btn_pending_close).setOnClickListener(v -> AppDialog.dismissSafely(dialog));
+        AppDialog.showSafely(this, dialog);
+
+        SyncQueueMaintenance.getQueueCountAsync(this, total ->
+                SyncQueueMaintenance.getQueueItemsAsync(this, PENDING_VIEW_LIMIT, items -> {
+                    if (isFinishing() || isDestroyed() || !dialog.isShowing()) return;
+                    container.removeAllViews();
+                    if (items.isEmpty()) {
+                        summary.setText("Nothing is waiting to be sent");
+                        return;
+                    }
+                    summary.setText(total > items.size()
+                            ? "Showing newest " + items.size() + " of " + total + " item(s)"
+                            : total + " item(s) · newest first · tap for details");
+                    for (SyncJob job : items) {
+                        container.addView(buildPendingRow(container, job));
+                    }
+                }));
+    }
+
+    private View buildPendingRow(ViewGroup parent, SyncJob job) {
+        View row = getLayoutInflater().inflate(R.layout.item_pending_job, parent, false);
+        TextView type = row.findViewById(R.id.pending_type);
+        TextView retries = row.findViewById(R.id.pending_retries);
+        TextView time = row.findViewById(R.id.pending_time);
+        TextView error = row.findViewById(R.id.pending_error);
+        TextView payload = row.findViewById(R.id.pending_payload);
+
+        type.setText(pendingJobLabel(job));
+        retries.setText(job.retryCount == 1 ? "1 retry" : job.retryCount + " retries");
+        time.setText("Queued " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                .format(new Date(job.createdAt)) + " · #" + job.id);
+
+        if (job.lastError != null && !job.lastError.trim().isEmpty()) {
+            error.setText("Last error: " + job.lastError.trim());
+        } else {
+            error.setVisibility(View.GONE);
+        }
+
+        String body = job.payloadJson != null ? job.payloadJson : "";
+        payload.setText(body);
+        row.setOnClickListener(v -> {
+            boolean expanded = payload.getMaxLines() == Integer.MAX_VALUE;
+            payload.setMaxLines(expanded ? 2 : Integer.MAX_VALUE);
+            error.setMaxLines(expanded ? 3 : Integer.MAX_VALUE);
+            if (!expanded) {
+                try {
+                    payload.setText(new JSONObject(body).toString(2));
+                } catch (Exception ignored) {
+                    payload.setText(body);
+                }
+            } else {
+                payload.setText(body);
+            }
+        });
+        return row;
+    }
+
+    private static String pendingJobLabel(SyncJob job) {
+        String ep = job.endpoint != null ? job.endpoint : "";
+        String label;
+        if (ep.equals(ApiEndpoints.CREATE_DAY)) label = "Start day";
+        else if (ep.equals(ApiEndpoints.END_DAY)) label = "End day";
+        else if (ep.equals(ApiEndpoints.START_TRIP)) label = "Start trip";
+        else if (ep.equals(ApiEndpoints.END_TRIP)) label = "End trip";
+        else if (ep.equals(ApiEndpoints.RECORD_TICKET)) label = "Ticket";
+        else if (ep.equals(ApiEndpoints.BLANK_TICKET)) label = "Blank ticket";
+        else if (ep.equals(ApiEndpoints.POSITIONING)) label = "Location";
+        else if (ep.equals(ApiEndpoints.REPORT_URL)) label = "Update report";
+        else if (ep.equals(ApiEndpoints.SETTINGS_AUDIT)) label = "Audit event";
+        else label = ep.startsWith(ApiEndpoints.BASE) ? ep.substring(ApiEndpoints.BASE.length()) : ep;
+
+        if (ep.equals(ApiEndpoints.SETTINGS_AUDIT) && job.payloadJson != null) {
+            try {
+                String name = new JSONObject(job.payloadJson).optString("event_name", "");
+                if (!name.isEmpty()) label += ": " + name;
+            } catch (Exception ignored) {
+            }
+        }
+        return label;
     }
 
     private void confirmClearQueue() {
-        new AlertDialog.Builder(this)
-                .setTitle("Clear sync queue?")
-                .setMessage("This removes all pending offline uploads on this device. They will not be sent to the server.")
-                .setPositiveButton("Clear", (d, w) -> clearQueue())
-                .setNegativeButton("Cancel", null)
+        AppDialog.with(this)
+                .type(AppDialog.Type.WARNING)
+                .title("Clear sync queue?")
+                .message("This removes all pending offline uploads on this device. They will not be sent to the server.")
+                .negative("Cancel", null)
+                .positive("Clear", this::clearQueue)
+                .positiveColor(android.graphics.Color.parseColor("#D32F2F"))
                 .show();
     }
 
@@ -496,6 +642,8 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         showStatus(tvUploadProgress, "Clearing…");
         SyncQueueMaintenance.clearAllQueueManual(this, removed -> {
             showStatus(tvUploadProgress, "Cleared " + removed + " item(s)");
+            SettingsAudit.log(this, SettingsAudit.Event.SYNC_QUEUE_CLEARED,
+                    "Removed " + removed + " pending item(s)");
             if (unlocked) refreshAll();
         });
     }
@@ -504,12 +652,254 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
     // Helpers
     // ---------------------------------------------------------------------
 
+    // ---------------------------------------------------------------------
+    // Registration (moved from the 15-tap gesture on Menu's version number)
+    // ---------------------------------------------------------------------
+
+    /** Rounded card dialog: the layout draws its own background, buttons are part of the layout. */
+    private AppCompatDialog createCardDialog(View content) {
+        AppCompatDialog dialog = new AppCompatDialog(this);
+        dialog.supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(content);
+        Window w = dialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        dialog.setOnShowListener(d -> {
+            Window shown = dialog.getWindow();
+            if (shown == null) return;
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.9f);
+            shown.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        });
+        return dialog;
+    }
+
+    private void showRegisterDialog() {
+        View form = getLayoutInflater().inflate(R.layout.dialog_register_device, null);
+        TextInputLayout tilPassword = form.findViewById(R.id.til_register_password);
+        TextInputLayout tilTenant = form.findViewById(R.id.til_register_tenant);
+        TextInputLayout tilMachine = form.findViewById(R.id.til_register_machine);
+        EditText etPassword = form.findViewById(R.id.register_admin_password);
+        EditText etTenant = form.findViewById(R.id.register_tenant_id);
+        EditText etMachine = form.findViewById(R.id.register_machine_id);
+        TextView tvStatus = form.findViewById(R.id.register_status);
+        MaterialButton btnSubmit = form.findViewById(R.id.btn_register_submit);
+
+        AppCompatDialog dialog = createCardDialog(form);
+
+        Runnable submit = () -> {
+            tilPassword.setError(null);
+            tilTenant.setError(null);
+            tilMachine.setError(null);
+            tvStatus.setVisibility(View.GONE);
+            submitRegistration(dialog, btnSubmit, tvStatus, tilPassword, tilTenant, tilMachine,
+                    etPassword.getText().toString().trim(),
+                    etTenant.getText().toString().trim(),
+                    etMachine.getText().toString().trim());
+        };
+
+        form.findViewById(R.id.btn_register_cancel).setOnClickListener(v -> dialog.dismiss());
+        btnSubmit.setOnClickListener(v -> submit.run());
+        etMachine.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submit.run();
+                return true;
+            }
+            return false;
+        });
+        dialog.show();
+        SettingsAudit.log(this, SettingsAudit.Event.REGISTRATION_OPENED);
+    }
+
+    private void logRegistrationFailed(String reason, @Nullable String tenantId, @Nullable String machine) {
+        JSONObject details = new JSONObject();
+        try {
+            details.put("entered_tenant_id", tenantId != null && !tenantId.isEmpty() ? tenantId : JSONObject.NULL)
+                    .put("entered_machine_id", machine != null && !machine.isEmpty() ? machine : JSONObject.NULL);
+        } catch (Exception ignored) {
+        }
+        SettingsAudit.log(this, SettingsAudit.Event.REGISTRATION_FAILED, reason, details);
+    }
+
+    private void submitRegistration(AppCompatDialog dialog, MaterialButton btnSubmit, TextView tvStatus,
+                                    TextInputLayout tilPassword, TextInputLayout tilTenant,
+                                    TextInputLayout tilMachine,
+                                    String pwd, String tenantId, String machine) {
+        if (!pwd.equals(REGISTER_PASSWORD)) {
+            tilPassword.setError("Unauthorised Access!");
+            logRegistrationFailed("Password error", tenantId, machine);
+            return;
+        }
+        if (tenantId.isEmpty() || machine.isEmpty()) {
+            if (tenantId.isEmpty()) tilTenant.setError("Tenant ID required");
+            if (machine.isEmpty()) tilMachine.setError("Machine ID required");
+            logRegistrationFailed("Tenant ID or Machine ID missing", tenantId, machine);
+            return;
+        }
+        int tenantIdInt;
+        int machineIdInt;
+        try {
+            tenantIdInt = Integer.parseInt(tenantId);
+            machineIdInt = Integer.parseInt(machine);
+        } catch (NumberFormatException e) {
+            showStatus(tvStatus, "Invalid Tenant ID or Machine ID.");
+            logRegistrationFailed("Invalid Tenant ID or Machine ID", tenantId, machine);
+            return;
+        }
+
+        hideKeyboard(dialog.getCurrentFocus());
+        btnSubmit.setEnabled(false);
+        btnSubmit.setText("Registering…");
+        Runnable resetButton = () -> {
+            btnSubmit.setEnabled(true);
+            btnSubmit.setText("Register");
+        };
+        AppExecutors.runBg(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("tenant_id", tenantIdInt);
+                body.put("machine_id", machineIdInt);
+                String resp = HttpUtil.postJson(ApiEndpoints.PROVISION_URL, body.toString());
+                JSONObject j = new JSONObject(resp);
+
+                if (j.optBoolean("success", false)) {
+                    String tn = j.optString("tenant_name", "");
+                    String pn = j.optString("phone_number", "");
+                    String ak = j.optString("api_key", "");
+                    runOnUiThread(() -> {
+                        PrefsSecure.saveTenantId(this, tenantId);
+                        PrefsSecure.saveMachineId(this, machine);
+                        PrefsSecure.saveTenantName(this, tn);
+                        PrefsSecure.saveFeedbackNumber(this, pn);
+                        PrefsSecure.saveApiKey(this, ak);
+                        SettingsAudit.log(this, SettingsAudit.Event.DEVICE_REGISTERED,
+                                "Registered as machine " + machine + (tn.isEmpty() ? "" : " for " + tn));
+                        // Provisioning is saved above even if the screen was closed meanwhile.
+                        if (isFinishing() || isDestroyed()) return;
+                        fillAbout();
+                        AppDialog.dismissSafely(dialog);
+                        Toast.makeText(this,
+                                "Registered successfully. Tenant: " + tn + ", Phone: " + pn,
+                                Toast.LENGTH_LONG).show();
+                        // Reboot only on success so :bg picks up new provisioning
+                        showRestartToCompleteDialog();
+                    });
+                } else {
+                    String err = j.optString("error", "Unknown error");
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) {
+                            logRegistrationFailed(err, tenantId, machine);
+                            return;
+                        }
+                        resetButton.run();
+                        showStatus(tvStatus, "Registration failed: " + err);
+                        logRegistrationFailed(err, tenantId, machine);
+                    });
+                }
+            } catch (Exception e) {
+                final String displayMsg = registrationErrorMessage(e);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        logRegistrationFailed(displayMsg, tenantId, machine);
+                        return;
+                    }
+                    resetButton.run();
+                    showStatus(tvStatus, "Registration failed: " + displayMsg);
+                    logRegistrationFailed(displayMsg, tenantId, machine);
+                });
+            }
+        });
+    }
+
+    private void showRestartToCompleteDialog() {
+        AppDialog.with(this)
+                .type(AppDialog.Type.SUCCESS)
+                .title("Registered")
+                .message("Restart to complete registration")
+                .negative("Later", null)
+                .positive("Restart", this::rebootDeviceIfOwner)
+                .show();
+    }
+
+    /** Reboot so the :bg process picks up new provisioning (tenant/machine id). Device owner only. */
+    private void rebootDeviceIfOwner() {
+        try {
+            DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+            if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) return;
+            dpm.reboot(new ComponentName(this, MyDeviceAdminReceiver.class));
+        } catch (Exception e) {
+            Toast.makeText(this, "Registered. Please restart the device manually.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Shows the server's "error" field when the HTTP error body contains JSON. */
+    private static String registrationErrorMessage(Exception e) {
+        String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+        int i = msg.indexOf("body=");
+        if (i >= 0) {
+            try {
+                JSONObject errJson = new JSONObject(msg.substring(i + 5).trim());
+                if (errJson.has("error")) {
+                    msg = errJson.optString("error", msg);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return msg;
+    }
+
+    // ---------------------------------------------------------------------
+    // Exit kiosk / admin mode (moved from the 15-tap gesture on Menu's "Powered By")
+    // ---------------------------------------------------------------------
+
+    private void showExitKioskDialog() {
+        View form = getLayoutInflater().inflate(R.layout.dialog_admin_password, null);
+        TextInputLayout tilPassword = form.findViewById(R.id.til_admin_password);
+        EditText etPassword = form.findViewById(R.id.admin_mode_password);
+
+        AppCompatDialog dialog = createCardDialog(form);
+
+        Runnable submit = () -> {
+            if (!etPassword.getText().toString().trim().equals(REGISTER_PASSWORD)) {
+                tilPassword.setError("Unauthorised Access!");
+                SettingsAudit.log(this, SettingsAudit.Event.ADMIN_ACCESS_FAILED, "Password error");
+                return;
+            }
+            tilPassword.setError(null);
+            hideKeyboard(etPassword);
+            dialog.dismiss();
+            SettingsAudit.log(this, SettingsAudit.Event.ADMIN_ACCESS_UNLOCKED,
+                    "Kiosk mode turned off and Android settings opened");
+            Toast.makeText(this, "Admin Mode Enabled!", Toast.LENGTH_SHORT).show();
+            KioskHelper.enterAdminMode(this);
+            Toast.makeText(this, "Admin mode activated – you can now access settings",
+                    Toast.LENGTH_LONG).show();
+        };
+
+        form.findViewById(R.id.btn_admin_cancel).setOnClickListener(v -> dialog.dismiss());
+        form.findViewById(R.id.btn_admin_submit).setOnClickListener(v -> submit.run());
+        etPassword.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submit.run();
+                return true;
+            }
+            return false;
+        });
+        dialog.show();
+        SettingsAudit.log(this, SettingsAudit.Event.ADMIN_ACCESS_OPENED);
+    }
+
     private void hideKeyboard() {
+        hideKeyboard(maintenancePassword);
+        maintenancePassword.clearFocus();
+    }
+
+    private void hideKeyboard(@Nullable View focused) {
+        if (focused == null) return;
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) {
-            imm.hideSoftInputFromWindow(maintenancePassword.getWindowToken(), 0);
+            imm.hideSoftInputFromWindow(focused.getWindowToken(), 0);
         }
-        maintenancePassword.clearFocus();
     }
 
     private static void showStatus(TextView tv, String text) {

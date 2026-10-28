@@ -34,11 +34,37 @@ public final class SyncClient {
         return t;
     });
 
+    /** Audit events have their own queue so they never delay ticket / day / trip uploads. */
+    private static final ExecutorService EXEC_AUDIT = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "SyncClient-audit");
+        t.setPriority(Thread.MIN_PRIORITY);
+        return t;
+    });
+
     private SyncClient(){}
 
     public interface Callback {
         void onSuccess(JSONObject resp);
         void onFail(String reason);
+    }
+
+    /** Callbacks run on the sync thread; an exception there would kill the app (or re-queue a sent item). */
+    private static void deliverSuccess(Callback cb, JSONObject resp) {
+        if (cb == null) return;
+        try {
+            cb.onSuccess(resp);
+        } catch (Throwable t) {
+            AppLog.e(TAG, "Sync success callback failed", t);
+        }
+    }
+
+    private static void deliverFail(Callback cb, String reason) {
+        if (cb == null) return;
+        try {
+            cb.onFail(reason);
+        } catch (Throwable t) {
+            AppLog.e(TAG, "Sync failure callback failed", t);
+        }
     }
 
     private static int safeInt(String s) throws NumberFormatException {
@@ -64,7 +90,7 @@ public final class SyncClient {
                     cb.onFail(failReason != null ? failReason : "unknown");
                 }
             } catch (Exception e) {
-                Log.e(TAG, "createDay callback crashed", e);
+                AppLog.e(TAG, "createDay callback crashed", e);
             }
         });
     }
@@ -80,7 +106,7 @@ public final class SyncClient {
                 String machineStr = PrefsSecure.getMachineId(appCtx);
                 if (tenantStr == null || tenantStr.trim().isEmpty()
                         || machineStr == null || machineStr.trim().isEmpty()) {
-                    Log.e(TAG, "createDay: missing tenant_id or machine_id — register device first");
+                    AppLog.e(TAG, "createDay: missing tenant_id or machine_id — register device first");
                     deliverCreateDayOnMain(cb, false, null, "Missing tenant or machine ID (register device)");
                     return;
                 }
@@ -113,19 +139,19 @@ public final class SyncClient {
                     } else {
                         // server responded fail → enqueue
                         String msg = resp.optString("message", "server fail");
-                        Log.w(TAG, "createDay server fail: " + msg);
+                        AppLog.w(TAG, "createDay server fail: " + msg);
                         LogSink.logTerminalFailure(appCtx, ApiEndpoints.CREATE_DAY, payload.toString(), msg);
                         deliverCreateDayOnMain(cb, false, null, msg);
                     }
                 } catch (Exception netOrParse) {
                     // IOException (network) or JSONException (bad body) → enqueue for retry
-                    Log.w(TAG, "createDay network/parse error, queueing: " + netOrParse.getMessage());
+                    AppLog.w(TAG, "createDay network/parse error, queueing: " + netOrParse.getMessage());
                     SyncQueueUtil.enqueue(appCtx, ApiEndpoints.CREATE_DAY, payload, netOrParse.getMessage());
                     deliverCreateDayOnMain(cb, false, null, netOrParse.getMessage());
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "createDay failed", e);
+                AppLog.e(TAG, "createDay failed", e);
                 deliverCreateDayOnMain(cb, false, null, e.getMessage());
             }
         });
@@ -172,18 +198,18 @@ public final class SyncClient {
                     String respStr = HttpUtil.postJson(ApiEndpoints.END_DAY, payload.toString());
                     JSONObject resp = new JSONObject(respStr);
                     if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        if (cb != null) cb.onSuccess(resp);
+                        deliverSuccess(cb, resp);
                     } else {
                         LogSink.logTerminalFailure(ctx, ApiEndpoints.END_DAY, payload.toString(),
                                 resp.optString("message", "server fail"));
-                        if (cb != null) cb.onFail(resp.optString("message", "server fail"));
+                        deliverFail(cb, resp.optString("message", "server fail"));
                     }
                 } catch (Exception netOrParse) {
                     SyncQueueUtil.enqueue(ctx, ApiEndpoints.END_DAY, payload, netOrParse.getMessage());
-                    if (cb != null) cb.onFail(netOrParse.getMessage());
+                    deliverFail(cb, netOrParse.getMessage());
                 }
-            } catch (JSONException | NumberFormatException e) {
-                if (cb != null) cb.onFail(e.getMessage());
+            } catch (Exception e) {
+                deliverFail(cb, e.getMessage());
             }
         });
     }
@@ -218,21 +244,21 @@ public final class SyncClient {
                         if (tripId > 0) {
                             Prefs.saveCurrentServerTripID(ctx, tripId);
                         }
-                        if (cb != null) cb.onSuccess(resp);
+                        deliverSuccess(cb, resp);
                     } else {
                         // server responded fail → enqueue
                         LogSink.logTerminalFailure(ctx, ApiEndpoints.CREATE_DAY, payload.toString(),
                                 resp.optString("message", "server fail"));
-                        if (cb != null) cb.onFail(resp.optString("message", "server fail"));
+                        deliverFail(cb, resp.optString("message", "server fail"));
                     }
                 } catch (Exception netOrParse) {
                     // no feedback / non-200 → enqueue
                     SyncQueueUtil.enqueue(ctx, ApiEndpoints.START_TRIP, payload, netOrParse.getMessage());
-                    if (cb != null) cb.onFail(netOrParse.getMessage());
+                    deliverFail(cb, netOrParse.getMessage());
                 }
 
             } catch (Exception e) {
-                if (cb != null) cb.onFail(e.getMessage());
+                deliverFail(cb, e.getMessage());
             }
         });
     }
@@ -261,18 +287,18 @@ public final class SyncClient {
                     String respStr = HttpUtil.postJson(ApiEndpoints.END_TRIP, payload.toString());
                     JSONObject resp = new JSONObject(respStr);
                     if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        if (cb != null) cb.onSuccess(resp);
+                        deliverSuccess(cb, resp);
                     } else {
                         LogSink.logTerminalFailure(ctx, ApiEndpoints.END_TRIP, payload.toString(),
                                 resp.optString("message", "server fail"));
-                        if (cb != null) cb.onFail(resp.optString("message", "server fail"));
+                        deliverFail(cb, resp.optString("message", "server fail"));
                     }
                 } catch (Exception netOrParse) {
                     SyncQueueUtil.enqueue(ctx, ApiEndpoints.END_TRIP, payload, netOrParse.getMessage());
-                    if (cb != null) cb.onFail(netOrParse.getMessage());
+                    deliverFail(cb, netOrParse.getMessage());
                 }
             } catch (Exception e) {
-                if (cb != null) cb.onFail(e.getMessage());
+                deliverFail(cb, e.getMessage());
             }
         });
     }
@@ -315,7 +341,7 @@ public final class SyncClient {
                     JSONObject resp = new JSONObject(respStr);
 
                     if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        if (cb != null) cb.onSuccess(resp);
+                        deliverSuccess(cb, resp);
                     } else {
                         // HTTP 200 but server says fail → log terminal, do NOT retry
                         LogSink.logTerminalFailure(
@@ -324,7 +350,7 @@ public final class SyncClient {
                                 payload.toString(),
                                 resp.optString("message", "server fail")
                         );
-                        if (cb != null) cb.onFail(resp.optString("message", "server fail"));
+                        deliverFail(cb, resp.optString("message", "server fail"));
                     }
                 } catch (Exception netOrParse) {
                     // Network/HTTP/parsing error → enqueue for retry
@@ -334,11 +360,11 @@ public final class SyncClient {
                             payload,
                             netOrParse.getMessage()
                     );
-                    if (cb != null) cb.onFail(netOrParse.getMessage());
+                    deliverFail(cb, netOrParse.getMessage());
                 }
 
             } catch (Exception e) {
-                if (cb != null) cb.onFail(e.getMessage());
+                deliverFail(cb, e.getMessage());
             }
         });
     }
@@ -366,7 +392,7 @@ public final class SyncClient {
                     JSONObject resp = new JSONObject(respStr);
 
                     if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        if (cb != null) cb.onSuccess(resp);
+                        deliverSuccess(cb, resp);
                     } else {
                         // Server replied with fail → log & no retry
                         LogSink.logTerminalFailure(
@@ -375,31 +401,33 @@ public final class SyncClient {
                                 payload.toString(),
                                 resp.optString("message", "server fail")
                         );
-                        if (cb != null) cb.onFail(resp.optString("message", "server fail"));
+                        deliverFail(cb, resp.optString("message", "server fail"));
                     }
 
                 } catch (Exception netOrParse) {
                     // 🌐 Network or JSON parse error → enqueue for later retry
                     SyncQueueUtil.enqueue(ctx, ApiEndpoints.BLANK_TICKET, payload, netOrParse.getMessage());
-                    if (cb != null) cb.onFail(netOrParse.getMessage());
+                    deliverFail(cb, netOrParse.getMessage());
                 }
 
             } catch (Exception e) {
-                if (cb != null) cb.onFail(e.getMessage());
+                deliverFail(cb, e.getMessage());
             }
         });
     }
 
     /**
-     * Report a failed Settings PIN attempt. The entered PIN is never sent.
-     * Queued for retry when offline, like other sync events.
+     * Send one Settings audit event (built by {@link SettingsAudit}). Queued for retry when offline.
+     * The device and tenant IDs are added here so every event carries them.
      */
-    public static void reportSettingsFailedLogin(Context ctx,
-                                                 int attemptNo,
-                                                 boolean locked,
-                                                 long lockedUntilMillis) {
+    public static void sendSettingsAudit(Context ctx, JSONObject event) {
+        sendSettingsAudit(ctx, event, true);
+    }
+
+    /** @param allowQueue false in the :bg process (no WorkManager there); a failed send is then dropped. */
+    public static void sendSettingsAudit(Context ctx, JSONObject event, boolean allowQueue) {
         final Context appCtx = ctx.getApplicationContext();
-        EXEC.execute(() -> {
+        EXEC_AUDIT.execute(() -> {
             JSONObject payload;
             try {
                 long versionCode = 0;
@@ -409,31 +437,28 @@ public final class SyncClient {
                             .getLongVersionCode();
                 } catch (Exception ignored) {
                 }
-                payload = new JSONObject()
+                payload = new JSONObject(event.toString())
                         .put("tenant_id", intOrZero(PrefsSecure.getTenantId(appCtx)))
                         .put("machine_id", intOrZero(PrefsSecure.getMachineId(appCtx)))
-                        .put("attempt_time", DateFmt.nowServerDateTime())
-                        .put("attempt_no", attemptNo)
-                        .put("locked", locked)
-                        .put("locked_until", locked
-                                ? new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-                                        .format(new java.util.Date(lockedUntilMillis))
-                                : JSONObject.NULL)
                         .put("app_version_code", versionCode);
-            } catch (Exception e) {
-                Log.w(TAG, "reportSettingsFailedLogin: payload build failed", e);
+            } catch (Throwable e) {
+                AppLog.w(TAG, "sendSettingsAudit: payload build failed", e);
                 return;
             }
 
             try {
-                String respStr = HttpUtil.postJson(ApiEndpoints.SETTINGS_FAILED_LOGIN, payload.toString());
+                String respStr = HttpUtil.postJson(ApiEndpoints.SETTINGS_AUDIT, payload.toString());
                 JSONObject resp = HttpUtil.parseJsonObjectLenient(respStr);
                 if (!"success".equalsIgnoreCase(resp.optString("status"))) {
-                    LogSink.logTerminalFailure(appCtx, ApiEndpoints.SETTINGS_FAILED_LOGIN,
+                    LogSink.logTerminalFailure(appCtx, ApiEndpoints.SETTINGS_AUDIT,
                             payload.toString(), resp.optString("message", "server fail"));
                 }
-            } catch (Exception netOrParse) {
-                SyncQueueUtil.enqueue(appCtx, ApiEndpoints.SETTINGS_FAILED_LOGIN, payload, netOrParse.getMessage());
+            } catch (Throwable netOrParse) {
+                if (!allowQueue) return;
+                try {
+                    SyncQueueUtil.enqueue(appCtx, ApiEndpoints.SETTINGS_AUDIT, payload, netOrParse.getMessage());
+                } catch (Throwable ignored) {
+                }
             }
         });
     }

@@ -1,272 +1,250 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".Day">
+    android:background="#FFFFFF"
+    tools:context=".Trip">
 
-    <!-- Top Logo -->
+    <!-- Top logo -->
     <ImageView
         android:id="@+id/image_logo_top"
-        android:layout_width="200dp"
-        android:layout_height="120dp"
-        android:layout_marginTop="32dp"
+        android:layout_width="118dp"
+        android:layout_height="116dp"
+        android:layout_marginTop="24dp"
+        android:adjustViewBounds="true"
+        android:importantForAccessibility="no"
         android:src="@mipmap/ayb_way_logo_foreground"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- ① Begin trip: choose route -->
     <LinearLayout
         android:id="@+id/layout_route"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="100dp"
-        android:gravity="center_horizontal"
         android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="24dp"
         android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/image_logo_top">
+        app:layout_constraintTop_toBottomOf="@+id/image_logo_top"
+        tools:visibility="gone">
+
+        <TextView
+            style="@style/FlowSubtitle"
+            android:layout_marginTop="20dp"
+            android:text="Step 1 of 2"
+            android:textColor="#031FB8"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/text_choose_route"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
+            style="@style/FlowTitle"
+            android:layout_marginTop="4dp"
             android:text="Choose Route"
-            android:textSize="34sp"
-            android:textStyle="bold" />
+            android:textSize="34sp" />
+
+        <TextView
+            style="@style/FlowSubtitle"
+            android:text="Use the arrows to select the route for this trip" />
 
         <LinearLayout
             android:id="@+id/route_selector"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:gravity="center"
+            android:layout_marginTop="36dp"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_left"
-                android:layout_width="74dp"
-                android:layout_height="74dp"
-                android:backgroundTint="#03A9F4"
-                android:paddingLeft="0dp"
-                android:paddingTop="0dp"
-                android:paddingRight="0dp"
-                android:paddingBottom="0dp"
-                android:text="@string/left"
-                android:textSize="34sp"
-                app:cornerRadius="0dp"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                style="@style/FlowArrowButton"
+                android:contentDescription="Previous route"
+                app:icon="@drawable/ic_chevron_left_24" />
 
             <TextView
                 android:id="@+id/view_route"
-                android:layout_width="250dp"
+                style="@style/FlowValueBox"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="16dp"
-                android:background="@drawable/textview_border"
-                android:ellipsize="end"
-                android:gravity="center"
-                android:singleLine="true"
-                android:text="Route 29/240"
-                android:textSize="38sp"
-                app:layout_constraintEnd_toStartOf="@id/button_right"
-                app:layout_constraintStart_toEndOf="@id/button_left"
-                app:layout_constraintTop_toTopOf="parent" />
+                android:maxLines="2"
+                android:minHeight="88dp"
+                android:singleLine="false"
+                android:textSize="28sp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_right"
-                android:layout_width="74dp"
-                android:layout_height="74dp"
-                android:backgroundTint="#03A9F4"
-                android:paddingLeft="0dp"
-                android:paddingTop="0dp"
-                android:paddingRight="0dp"
-                android:paddingBottom="0dp"
-                android:text="@string/right"
-                android:textSize="34sp"
-                app:cornerRadius="0dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                style="@style/FlowArrowButton"
+                android:contentDescription="Next route"
+                app:icon="@drawable/ic_chevron_right_24" />
         </LinearLayout>
 
-        <LinearLayout
+        <Space
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
+            android:layout_height="50dp" />
 
-            <Button
-                android:id="@+id/button_submit"
-                android:layout_width="300dp"
-                android:layout_height="100dp"
-                android:backgroundTint="#4CAF50"
-                android:text="OK"
-                android:textSize="34sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_submit"
+            style="@style/FlowPrimaryButton"
+            android:backgroundTint="@color/flow_confirm_tint"
+            android:text="NEXT" />
 
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="30dp" />
-
-            <Button
-                android:id="@+id/button_back"
-                android:layout_width="300dp"
-                android:layout_height="100dp"
-                android:layout_weight="1"
-                android:backgroundTint="#FF0000"
-                android:text="BACK"
-                android:textSize="34sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
-        </LinearLayout>
-
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_back"
+            style="@style/FlowSecondaryButton"
+            android:layout_marginTop="14dp"
+            android:text="BACK" />
     </LinearLayout>
 
+    <!-- ② Begin trip: choose direction -->
+
+    <!-- ③ Stop trip: confirm -->
     <LinearLayout
         android:id="@+id/layout_direction"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="24dp"
         android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/image_logo_top">
+        app:layout_constraintTop_toBottomOf="@+id/image_logo_top"
+        app:layout_constraintVertical_bias="1.0"
+        tools:visibility="gone">
+
+        <TextView
+            style="@style/FlowSubtitle"
+            android:layout_marginTop="20dp"
+            android:text="Step 2 of 2"
+            android:textColor="#031FB8"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/text_choose_direction"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
+            style="@style/FlowTitle"
+            android:layout_marginTop="4dp"
             android:text="Choose Direction"
             android:textSize="34sp"
             android:textStyle="bold" />
 
+        <TextView
+            style="@style/FlowSubtitle"
+            android:text="Tap the direction this bus is travelling" />
+
         <LinearLayout
             android:id="@+id/direction_selector"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="30dp"
-            android:orientation="vertical"
-            android:paddingLeft="30dp"
-            android:paddingRight="30dp">
-
-            <Button
-                android:id="@+id/direction1"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:backgroundTint="#3F51B5"
-                android:textSize="34sp"
-                app:cornerRadius="0dp" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="60dp" />
-
-            <Button
-                android:id="@+id/direction2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:backgroundTint="#3F51B5"
-                android:textSize="34sp"
-                app:cornerRadius="0dp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="30dp"
-            android:gravity="center_horizontal"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
             android:orientation="vertical">
 
-            <Button
-                android:id="@+id/button_submit_direction"
-                android:layout_width="300dp"
-                android:layout_height="100dp"
-                android:backgroundTint="#4CAF50"
-                android:text="OK"
-                android:textSize="34sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/direction1"
+                style="@style/FlowPrimaryButton"
+                android:layout_height="wrap_content"
+                android:backgroundTint="#3F51B5"
+                android:minHeight="104dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:textSize="24sp" />
 
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="30dp" />
-
-            <Button
-                android:id="@+id/button_back3"
-                android:layout_width="300dp"
-                android:layout_height="100dp"
-                android:layout_weight="1"
-                android:backgroundTint="#FF0000"
-                android:text="BACK"
-                android:textSize="34sp"
-                android:textStyle="bold"
-                app:cornerRadius="0dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/direction2"
+                style="@style/FlowPrimaryButton"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:backgroundTint="#3F51B5"
+                android:minHeight="104dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:textSize="24sp" />
         </LinearLayout>
 
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="80dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_submit_direction"
+            style="@style/FlowPrimaryButton"
+            android:backgroundTint="#2B9B06"
+            android:text="START TRIP" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_back3"
+            style="@style/FlowSecondaryButton"
+            android:layout_marginTop="14dp"
+            android:text="BACK" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/layout_end_trip"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="50dp"
-        android:gravity="center_horizontal"
         android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="24dp"
         android:visibility="visible"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/image_logo_top"
-        tools:layout_editor_absoluteX="0dp">
+        tools:visibility="visible">
+
+        <FrameLayout
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="40dp"
+            android:background="@drawable/bg_icon_circle"
+            android:backgroundTint="#FFF0E0">
+
+            <ImageView
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_warning_24"
+                app:tint="#E65100" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/textView14"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Do you want to end this Trip?"
-            android:textAlignment="center"
-            android:textSize="34sp"
-            android:textStyle="bold" />
+            style="@style/FlowTitle"
+            android:layout_marginTop="20dp"
+            android:text="End this Trip?"
+            android:textSize="34sp" />
+
+        <TextView
+            style="@style/FlowSubtitle"
+            android:text="Ticketing stops for this trip once it is ended." />
 
         <Space
             android:layout_width="match_parent"
-            android:layout_height="70dp" />
+            android:layout_height="60dp" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/button_end_trip"
-            android:layout_width="250dp"
-            android:layout_height="91dp"
+            style="@style/FlowPrimaryButton"
             android:backgroundTint="#FF9800"
-            android:text="STOP TRIP"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            android:text="STOP TRIP" />
 
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="70dp" />
-
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/button_back2"
-            android:layout_width="250dp"
-            android:layout_height="91dp"
-            android:backgroundTint="#F80101"
-            android:text="BACK"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            style="@style/FlowSecondaryButton"
+            android:layout_marginTop="14dp"
+            android:text="BACK" />
     </LinearLayout>
-
-    <!-- Title -->
-
-    <!-- Route Selector Row -->
-
-    <!-- Bottom Logo (if needed) -->
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -28,5 +28,5 @@ public final class ApiEndpoints {
     public static final String POSITIONING   = BASE + "/sync/positioning.php";
 
     // ---- Settings ----
-    public static final String SETTINGS_FAILED_LOGIN = BASE + "/settings/failed_login.php";
+    public static final String SETTINGS_AUDIT = BASE + "/settings/audit.php";
 }

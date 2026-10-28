@@ -31,6 +31,7 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         CrashLogger.init(this);
+        AppLog.init(this);
 
         // When running in :bg process (location sync), do minimal work so the process is ready
         // quickly and LocationForegroundService can call startForeground() within the timeout.
@@ -54,20 +55,20 @@ public class App extends Application {
                 Prefs.setWorkManagerFloodCleaned(this, true);
                 Log.i("App", "One-time WorkManager cancelAllWork done (cleared job flood)");
             } catch (Exception e) {
-                Log.w("App", "WorkManager cancelAllWork failed", e);
+                AppLog.w("App", "WorkManager cancelAllWork failed", e);
             }
         }
         // Clean up old finished/cancelled WorkManager jobs.
         try {
             WorkManager.getInstance(this).pruneWork();
         } catch (Exception e) {
-            Log.w("App", "WorkManager prune failed", e);
+            AppLog.w("App", "WorkManager prune failed", e);
         }
         // Start location service unconditionally so it runs even if WorkManager threw (e.g. on new install).
         try {
             LocationForegroundService.startIfNeeded(this);
         } catch (Exception e) {
-            Log.w("App", "LocationForegroundService start failed", e);
+            AppLog.w("App", "LocationForegroundService start failed", e);
         }
 
         scheduleDailyFetch(this);
@@ -83,7 +84,7 @@ public class App extends Application {
                 UpdateScheduler.enqueueCheckOnly(this, true);
                 Log.d("App", "Launch fallback: enqueued check-only update");
             } catch (Exception e) {
-                Log.w("App", "Launch fallback enqueue failed", e);
+                AppLog.w("App", "Launch fallback enqueue failed", e);
             }
         }
 
@@ -100,7 +101,7 @@ public class App extends Application {
                     ExistingPeriodicWorkPolicy.KEEP,
                     backupReq);
         } catch (Exception e) {
-            Log.w("App", "Daily update backup schedule failed", e);
+            AppLog.w("App", "Daily update backup schedule failed", e);
         }
 
         // After update relaunch: run DB sync once (update-first flow)
@@ -108,7 +109,7 @@ public class App extends Application {
             try {
                 AppDatabase.forceRefresh(this);
             } catch (Exception e) {
-                android.util.Log.w("App", "DB sync on launch failed", e);
+                AppLog.w("App", "DB sync on launch failed", e);
             }
         }
 
@@ -129,7 +130,7 @@ public class App extends Application {
                 Log.i("App", "Update flag cleared (installed " + installed + ")");
             }
         } catch (Exception e) {
-            Log.w("App", "clearUpdateFlagIfInstalled failed", e);
+            AppLog.w("App", "clearUpdateFlagIfInstalled failed", e);
         }
     }
 
@@ -147,7 +148,7 @@ public class App extends Application {
                     ExistingPeriodicWorkPolicy.KEEP,
                     drainReq);
         } catch (Exception e) {
-            Log.w("App", "Periodic sync drain schedule failed", e);
+            AppLog.w("App", "Periodic sync drain schedule failed", e);
         }
     }
 
@@ -162,7 +163,7 @@ public class App extends Application {
         try {
             return Application.getProcessName();
         } catch (Exception e) {
-            Log.w("App", "getProcessName failed", e);
+            AppLog.w("App", "getProcessName failed", e);
         }
         return null;
     }
@@ -174,11 +175,20 @@ public class App extends Application {
      * and from FetchReceiver after it runs so the next day is scheduled (exact alarms are one-shot).
      * Defensive: always attempts to set some alarm; on any failure falls back to inexact set().
      */
+    /** Alarm scheduling must never crash app start (e.g. alarm limit reached). */
     public static void scheduleDailyFetch(Context context) {
+        try {
+            scheduleDailyFetchInternal(context);
+        } catch (Throwable t) {
+            AppLog.e("App", "scheduleDailyFetch failed", t);
+        }
+    }
+
+    private static void scheduleDailyFetchInternal(Context context) {
         Context ctx = context.getApplicationContext();
         AlarmManager alarmManager = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager == null) {
-            Log.w("SyncTriggered", "AlarmManager null, cannot schedule daily fetch");
+            AppLog.w("SyncTriggered", "AlarmManager null, cannot schedule daily fetch");
             return;
         }
 
@@ -213,7 +223,7 @@ public class App extends Application {
                 scheduled = true;
                 Log.d("SyncTriggered", "Using setAlarmClock for daily update");
             } catch (Exception e) {
-                Log.w("SyncTriggered", "setAlarmClock failed, trying exact alarm", e);
+                AppLog.w("SyncTriggered", "setAlarmClock failed, trying exact alarm", e);
             }
             if (!scheduled) {
                 try {
@@ -222,7 +232,7 @@ public class App extends Application {
                         scheduled = true;
                     }
                 } catch (SecurityException e) {
-                    Log.w("SyncTriggered", "setExactAndAllowWhileIdle not allowed", e);
+                    AppLog.w("SyncTriggered", "setExactAndAllowWhileIdle not allowed", e);
                 }
             }
             if (!scheduled) {
@@ -235,12 +245,12 @@ public class App extends Application {
                 }
             }
         } catch (Exception e) {
-            Log.e("SyncTriggered", "Failed to schedule daily fetch, using inexact fallback", e);
+            AppLog.e("SyncTriggered", "Failed to schedule daily fetch, using inexact fallback", e);
             try {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent);
                 scheduled = true;
             } catch (Exception e2) {
-                Log.e("SyncTriggered", "Could not set daily fetch alarm", e2);
+                AppLog.e("SyncTriggered", "Could not set daily fetch alarm", e2);
             }
         }
         if (scheduled) {
@@ -253,6 +263,14 @@ public class App extends Application {
      * still run one update check before midnight. One-shot; reschedule from UpdateFallbackReceiver.
      */
     public static void scheduleDailyFetchFallback(Context context) {
+        try {
+            scheduleDailyFetchFallbackInternal(context);
+        } catch (Throwable t) {
+            AppLog.e("App", "scheduleDailyFetchFallback failed", t);
+        }
+    }
+
+    private static void scheduleDailyFetchFallbackInternal(Context context) {
         Context ctx = context.getApplicationContext();
         AlarmManager alarmManager = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager == null) return;

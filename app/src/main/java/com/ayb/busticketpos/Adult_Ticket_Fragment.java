@@ -31,7 +31,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatDialog;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -77,6 +77,8 @@ public class Adult_Ticket_Fragment extends Fragment {
     private int selectedButtonColor;
 
     private Printer       mPrinter;
+    /** Application context for background work (safe after the fragment detaches). */
+    private Context       appCtx;
     private Context       mContext;
 
     private int          selectedTariffIndex  = -1;
@@ -138,17 +140,22 @@ public class Adult_Ticket_Fragment extends Fragment {
         // 3️⃣ Printer setup
         mContext       = getActivity();
         // ─── Printer ────────────────────────────────────
-        DriverManager mDriverManager = DriverManager.getInstance();
-        mPrinter       = mDriverManager.getPrinter();
+        appCtx = requireContext().getApplicationContext();
+        try {
+            mPrinter = DriverManager.getInstance().getPrinter();
+        } catch (Throwable t) {
+            mPrinter = null;
+            AppLog.e("Printer", "Printer SDK unavailable", t);
+        }
 //        boolean isSupportCutter = mPrinter.isSuppoerCutter();
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             List<TariffRange> list = AppDatabase
-                    .getInstance(requireContext())
+                    .getInstance(appCtx)
                     .tariffDao()
                     .getAllSync(); // make sure this returns List<TariffRange>
 
-            requireActivity().runOnUiThread(() -> {
+            runOnUiSafe(() -> {
                 allTariffRanges.clear();
                 allTariffRanges.addAll(list);
             });
@@ -263,15 +270,16 @@ public class Adult_Ticket_Fragment extends Fragment {
 
     @SuppressLint("ResourceAsColor")
     private void showTariffsDialog() {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             // 1️⃣ load all tariff‐ranges
             List<TariffRange> allRanges = AppDatabase
-                    .getInstance(requireContext())
+                    .getInstance(appCtx)
                     .tariffDao()
                     .getAllSync();
 
             // 2️⃣ build (stageName → fare) for each stage after currentStageIndex
             List<Pair<String,Integer>> rows = new ArrayList<>();
+            if (!clampStageIndex()) return;
             int startNo = stageNos.get(currentStageIndex);
             int startLoopIndex = loopIndices.get(currentStageIndex);
             int startOrder = stageOrder.get(currentStageIndex);
@@ -300,7 +308,7 @@ public class Adult_Ticket_Fragment extends Fragment {
             }
 
             // 3️⃣ back on UI → inflate dialog
-            requireActivity().runOnUiThread(() -> {
+            runOnUiSafe(() -> {
                 View dlgView = LayoutInflater.from(getContext())
                         .inflate(R.layout.dialog_tariffs, null);
 
@@ -341,10 +349,8 @@ public class Adult_Ticket_Fragment extends Fragment {
                     listContainer.addView(row);
                 }
 
-                // 5️⃣ build & show AlertDialog
-                AlertDialog dialog = new AlertDialog.Builder(getContext())
-                        .setView(dlgView)
-                        .create();
+                // 5️⃣ build & show dialog
+                AppCompatDialog dialog = AppDialog.wrap(requireContext(), dlgView, 0.95f);
 
                 // wire the dialog buttons:
                 Button btnPrint = dlgView.findViewById(R.id.btn_tariff_print);
@@ -363,7 +369,7 @@ public class Adult_Ticket_Fragment extends Fragment {
                     }
                 });
 
-                dialog.show();
+                AppDialog.showSafely(getActivity(), dialog);
             });
         });
     }
@@ -377,6 +383,7 @@ public class Adult_Ticket_Fragment extends Fragment {
             btnRight.setEnabled(false);
             selectedStation = "";
         } else {
+            clampStageIndex();
             selectedStation = stageNames.get(currentStageIndex);
             viewStage.setText(selectedStation);
             btnLeft .setEnabled(currentStageIndex > 0);
@@ -394,9 +401,9 @@ public class Adult_Ticket_Fragment extends Fragment {
         );
 
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             List<TariffRange> all = AppDatabase
-                    .getInstance(requireContext())
+                    .getInstance(appCtx)
                     .tariffDao()
                     .getAllSync();
 
@@ -415,7 +422,7 @@ public class Adult_Ticket_Fragment extends Fragment {
                 adultTariffs.add(String.valueOf(t));
             }
 
-            requireActivity().runOnUiThread(() ->
+            runOnUiSafe(() ->
                     populateFareButtons(adultTariffs)
             );
         });
@@ -529,101 +536,47 @@ public class Adult_Ticket_Fragment extends Fragment {
         return bestMatch;
     }
 
+    /** Day changed since the trip started: send the operator back to Menu. */
+    private void showTripExpiredDialog() {
+        AppDialog.with(requireActivity())
+                .type(AppDialog.Type.WARNING)
+                .title("Trip Expired!")
+                .message("End Trip and Start a New One")
+                .positive("OK", () -> {
+                    startActivity(new Intent(getActivity(), Menu.class));
+                    requireActivity().finish();
+                })
+                .cancelable(false)
+                .show();
+    }
+
     /** Send the print job to the ZCS printer */
     private void printTicket() {
 
         String today = new SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(new Date());
 
-        if(!Prefs.getDayDate(mContext).equals(today)){
-            String msg = "Trip Expired! End Trip and Start a New One";
-            SpannableString sizedMsg = new SpannableString(msg);
-            // the second parameter "true" means "treat the 18 as SP, not pixels"
-            sizedMsg.setSpan(
-                    new AbsoluteSizeSpan(48, true),  // 18sp text size
-                    0,                                // start
-                    msg.length(),                     // end
-                    Spannable.SPAN_INCLUSIVE_INCLUSIVE
-            );
-            sizedMsg.setSpan(
-                    new AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER),
-                    0, msg.length(),
-                    Spanned.SPAN_INCLUSIVE_INCLUSIVE
-            );
-
-            AlertDialog dialog = new AlertDialog.Builder(getActivity())
-                    .setMessage(sizedMsg)
-                    .setPositiveButton("OK", null)
-                    .show();
-
-            // 🚫 Prevent dismiss when touching outside or pressing Back
-            dialog.setCanceledOnTouchOutside(false);
-            dialog.setCancelable(false);
-
-            Button okButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-
-            // • Increase text size to 20sp
-            okButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-
-            // • Change text color to white (for contrast)
-            okButton.setTextColor(Color.WHITE);
-
-            // • Paint its background blue
-            okButton.setBackgroundColor(Color.BLUE);
-
-            // (Optional) If you want rounded corners or padding:
-            int pad = (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, 20, getResources().getDisplayMetrics()
-            );
-            okButton.setPadding(pad, pad, pad, pad);
-            okButton.setAllCaps(false);
-            LinearLayout parent = (LinearLayout) okButton.getParent();
-            parent.setGravity(Gravity.CENTER);
-
-            // (Optional) If you want the button to stretch across and then center its text:
-            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) okButton.getLayoutParams();
-            params.width = LinearLayout.LayoutParams.MATCH_PARENT;
-            okButton.setLayoutParams(params);
-            okButton.setGravity(Gravity.CENTER);
-
-            TextView messageView = dialog.findViewById(android.R.id.message);
-            if (messageView != null) {
-                // 3️⃣ convert 16dp to pixels
-                int extraPx = (int) TypedValue.applyDimension(
-                        TypedValue.COMPLEX_UNIT_DIP,
-                        16,
-                        getResources().getDisplayMetrics()
-                );
-
-                // 4️⃣ add it to the bottom padding
-                messageView.setPadding(
-                        messageView.getPaddingLeft(),
-                        messageView.getPaddingTop(),
-                        messageView.getPaddingRight(),
-                        messageView.getPaddingBottom() + extraPx
-                );
-            }
-
-            dialog.getWindow().setBackgroundDrawable(
-                    new ColorDrawable(Color.parseColor("#FFAA00"))
-            );
-
-            // ✅ Add click listener for OK button
-            okButton.setOnClickListener(view -> {
-                // Example: Redirect to Menu Activity
-                Intent i = new Intent(getActivity(), Menu.class);
-                startActivity(i);
-                getActivity().finish();
-            });
+        if(!today.equals(Prefs.getDayDate(mContext))){
+            showTripExpiredDialog();
 
         }
 
 
-        int printStatus = mPrinter.getPrinterStatus();
+        if (mPrinter == null) {
+            showPrinterError(null);
+            return;
+        }
+        int printStatus;
+        try {
+            printStatus = mPrinter.getPrinterStatus();
+        } catch (Throwable t) {
+            showPrinterError(t);
+            return;
+        }
 
         if (printStatus == SdkResult.SDK_PRN_STATUS_PAPEROUT) {
             Toast.makeText(mContext, "OUT OF PAPER — Logged as Blank Ticket", Toast.LENGTH_LONG).show();
 
-            Executors.newSingleThreadExecutor().execute(() -> {
+            AppExecutors.runBg(() -> {
                 try {
                     AppDatabase db = AppDatabase.getInstance(mContext);
 
@@ -636,7 +589,7 @@ public class Adult_Ticket_Fragment extends Fragment {
 
                     long id = db.blankTicketDao().insert(blankTicket);
 
-                    Log.w("Printer", "Paper-out logged as blank ticket #" + id + " (tripId=" + tripId + ")");
+                    AppLog.w("Printer", "Paper-out logged as blank ticket #" + id + " (tripId=" + tripId + ")");
 
                     // ✅ Push online immediately (optional)
                     SyncClient.recordBlankTicket(
@@ -650,7 +603,7 @@ public class Adult_Ticket_Fragment extends Fragment {
 
                                 @Override
                                 public void onFail(String reason) {
-                                    Log.w("BLANK_SYNC", "Blank ticket upload failed: " + reason);
+                                    AppLog.w("BLANK_SYNC", "Blank ticket upload failed: " + reason);
                                 }
                             }
                     );
@@ -692,6 +645,10 @@ public class Adult_Ticket_Fragment extends Fragment {
         ticketNo++;
         Prefs.saveTicketCount(mContext, ticketNo);
 
+        if (!clampStageIndex()) {
+            Toast.makeText(mContext, "No Station Selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
         String currentStage = stageNames.get(currentStageIndex);
         String destination = calculateDestinationStage(currentStageIndex, Integer.parseInt(fareValue));
 
@@ -707,14 +664,15 @@ public class Adult_Ticket_Fragment extends Fragment {
         try {
             ticketAmount = Integer.parseInt(fareValue.trim());
         } catch (NumberFormatException e) {
-            Log.e("TicketError", "Tariff is not a valid number: " + fareValue);
-            requireActivity().runOnUiThread(() ->
+            AppLog.e("TicketError", "Tariff is not a valid number: " + fareValue);
+            runOnUiSafe(() ->
                     Toast.makeText(mContext, "Invalid fare format", Toast.LENGTH_SHORT).show()
             );
             return;
         }
 
 
+        try {
         PrnStrFormat fmt = new PrnStrFormat();
 
         //Company Name
@@ -786,12 +744,17 @@ public class Adult_Ticket_Fragment extends Fragment {
         mPrinter.setPrintAppendString("", fmt);
 
         mPrinter.setPrintStart();
+        } catch (Throwable t) {
+            // Nothing is saved when printing fails (same as before, when this crashed).
+            showPrinterError(t);
+            return;
+        }
 
         //Store in DB
 
         int finalTicketNo = ticketNo;
-        Executors.newSingleThreadExecutor().execute(() -> {
-            AppDatabase db = AppDatabase.getInstance(requireContext());
+        AppExecutors.runBg(() -> {
+            AppDatabase db = AppDatabase.getInstance(appCtx);
             TripEntity trip = db.ticketDao().getLastTrip();  // get current trip
 
             if (trip == null) return; // No trip in progress
@@ -825,14 +788,14 @@ public class Adult_Ticket_Fragment extends Fragment {
                              Log.d("TICKET_SYNC", "Ticket sent: " + resp);
                         }
                         @Override public void onFail(String reason) {
-                            Log.e("TICKET_SYNC", "Ticket send failed: " + reason);
+                            AppLog.e("TICKET_SYNC", "Ticket send failed: " + reason);
 
                         }
                     }
             );
         });
 
-        requireActivity().runOnUiThread(() -> {
+        runOnUiSafe(() -> {
             if (selectedButton != null) {
                 selectedButton.setBackgroundTintList(ColorStateList.valueOf(defaultButtonColor));
                 fareValue = "";
@@ -846,95 +809,27 @@ public class Adult_Ticket_Fragment extends Fragment {
 
         String today = new SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(new Date());
 
-        if(!Prefs.getDayDate(mContext).equals(today)){
-            String msg = "Trip Expired! End Trip and Start a New One";
-            SpannableString sizedMsg = new SpannableString(msg);
-            // the second parameter "true" means "treat the 18 as SP, not pixels"
-            sizedMsg.setSpan(
-                    new AbsoluteSizeSpan(28, true),  // 18sp text size
-                    0,                                // start
-                    msg.length(),                     // end
-                    Spannable.SPAN_INCLUSIVE_INCLUSIVE
-            );
-            sizedMsg.setSpan(
-                    new AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER),
-                    0, msg.length(),
-                    Spanned.SPAN_INCLUSIVE_INCLUSIVE
-            );
-
-            AlertDialog dialog = new AlertDialog.Builder(getActivity())
-                    .setMessage(sizedMsg)
-                    .setPositiveButton("OK", null)
-                    .show();
-
-            // 🚫 Prevent dismiss when touching outside or pressing Back
-            dialog.setCanceledOnTouchOutside(false);
-            dialog.setCancelable(false);
-
-            Button okButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-
-            // • Increase text size to 20sp
-            okButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-
-            // • Change text color to white (for contrast)
-            okButton.setTextColor(Color.WHITE);
-
-            // • Paint its background blue
-            okButton.setBackgroundColor(Color.BLUE);
-
-            // (Optional) If you want rounded corners or padding:
-            int pad = (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, 20, getResources().getDisplayMetrics()
-            );
-            okButton.setPadding(pad, pad, pad, pad);
-            okButton.setAllCaps(false);
-            LinearLayout parent = (LinearLayout) okButton.getParent();
-            parent.setGravity(Gravity.CENTER);
-
-            // (Optional) If you want the button to stretch across and then center its text:
-            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) okButton.getLayoutParams();
-            params.width = LinearLayout.LayoutParams.MATCH_PARENT;
-            okButton.setLayoutParams(params);
-            okButton.setGravity(Gravity.CENTER);
-
-            TextView messageView = dialog.findViewById(android.R.id.message);
-            if (messageView != null) {
-                // 3️⃣ convert 16dp to pixels
-                int extraPx = (int) TypedValue.applyDimension(
-                        TypedValue.COMPLEX_UNIT_DIP,
-                        16,
-                        getResources().getDisplayMetrics()
-                );
-
-                // 4️⃣ add it to the bottom padding
-                messageView.setPadding(
-                        messageView.getPaddingLeft(),
-                        messageView.getPaddingTop(),
-                        messageView.getPaddingRight(),
-                        messageView.getPaddingBottom() + extraPx
-                );
-            }
-
-            dialog.getWindow().setBackgroundDrawable(
-                    new ColorDrawable(Color.parseColor("#FFAA00"))
-            );
-
-            // ✅ Add click listener for OK button
-            okButton.setOnClickListener(view -> {
-                // Example: Redirect to Menu Activity
-                Intent i = new Intent(getActivity(), Menu.class);
-                startActivity(i);
-                getActivity().finish();
-            });
+        if(!today.equals(Prefs.getDayDate(mContext))){
+            showTripExpiredDialog();
 
         }
 
-        int printStatus = mPrinter.getPrinterStatus();
+        if (mPrinter == null) {
+            showPrinterError(null);
+            return;
+        }
+        int printStatus;
+        try {
+            printStatus = mPrinter.getPrinterStatus();
+        } catch (Throwable t) {
+            showPrinterError(t);
+            return;
+        }
 
         if (printStatus == SdkResult.SDK_PRN_STATUS_PAPEROUT) {
             Toast.makeText(mContext, "OUT OF PAPER — Logged as Blank Ticket", Toast.LENGTH_LONG).show();
 
-            Executors.newSingleThreadExecutor().execute(() -> {
+            AppExecutors.runBg(() -> {
                 try {
                     AppDatabase db = AppDatabase.getInstance(mContext);
 
@@ -947,7 +842,7 @@ public class Adult_Ticket_Fragment extends Fragment {
 
                     long id = db.blankTicketDao().insert(blankTicket);
 
-                    Log.w("Printer", "Paper-out logged as blank ticket #" + id + " (tripId=" + tripId + ")");
+                    AppLog.w("Printer", "Paper-out logged as blank ticket #" + id + " (tripId=" + tripId + ")");
 
                     // ✅ Push online immediately (optional)
                     SyncClient.recordBlankTicket(
@@ -961,7 +856,7 @@ public class Adult_Ticket_Fragment extends Fragment {
 
                                 @Override
                                 public void onFail(String reason) {
-                                    Log.w("BLANK_SYNC", "Blank ticket upload failed: " + reason);
+                                    AppLog.w("BLANK_SYNC", "Blank ticket upload failed: " + reason);
                                 }
                             }
                     );
@@ -999,6 +894,10 @@ public class Adult_Ticket_Fragment extends Fragment {
 
         routeName = Prefs.getSelectedRouteName(mContext);
 
+        if (!clampStageIndex()) {
+            Toast.makeText(mContext, "No Station Selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
         String currentStage = stageNames.get(currentStageIndex);
 
         String currentDate = new SimpleDateFormat(
@@ -1009,6 +908,7 @@ public class Adult_Ticket_Fragment extends Fragment {
                 "HH:mm:ss", Locale.getDefault()
         ).format(new Date());
 
+        try {
         PrnStrFormat fmt = new PrnStrFormat();
 
         //Company Name
@@ -1080,12 +980,17 @@ public class Adult_Ticket_Fragment extends Fragment {
         mPrinter.setPrintAppendString("", fmt);
 
         mPrinter.setPrintStart();
+        } catch (Throwable t) {
+            // Nothing is saved when printing fails (same as before, when this crashed).
+            showPrinterError(t);
+            return;
+        }
 
         //Store in DB
 
         int finalTicketNo = ticketNo;
-        Executors.newSingleThreadExecutor().execute(() -> {
-            AppDatabase db = AppDatabase.getInstance(requireContext());
+        AppExecutors.runBg(() -> {
+            AppDatabase db = AppDatabase.getInstance(appCtx);
             TripEntity trip = db.ticketDao().getLastTrip();
 
             if (trip == null) return;
@@ -1119,7 +1024,7 @@ public class Adult_Ticket_Fragment extends Fragment {
                             Log.d("TICKET_SYNC", "Ticket sent: " + resp);
                         }
                         @Override public void onFail(String reason) {
-                            Log.e("TICKET_SYNC", "Ticket send failed: " + reason);
+                            AppLog.e("TICKET_SYNC", "Ticket send failed: " + reason);
 
                         }
                     }
@@ -1132,9 +1037,44 @@ public class Adult_Ticket_Fragment extends Fragment {
     }
 
 
+    /** Posts to the UI thread only while the fragment is attached; errors are logged, not thrown. */
+    private void runOnUiSafe(Runnable r) {
+        android.app.Activity a = getActivity();
+        if (a == null) return;
+        a.runOnUiThread(() -> {
+            if (!isAdded() || getActivity() == null) return;
+            try {
+                r.run();
+            } catch (Throwable t) {
+                AppLog.e("TicketFragment", "UI update failed", t);
+            }
+        });
+    }
+
+    /** Keeps currentStageIndex inside the stage list (it can be stale after a route data refresh). */
+    private boolean clampStageIndex() {
+        int size = Math.min(stageNames.size(), stageNos.size());
+        if (size == 0) return false;
+        if (currentStageIndex < 0) currentStageIndex = 0;
+        if (currentStageIndex >= size) currentStageIndex = size - 1;
+        return true;
+    }
+
+    private void showPrinterError(@Nullable Throwable t) {
+        AppLog.e("Printer", "Ticket printing failed", t);
+        android.app.Activity a = getActivity();
+        if (a == null || !isAdded()) return;
+        AppDialog.with(a)
+                .type(AppDialog.Type.ERROR)
+                .title("Printer error")
+                .message("The ticket could not be printed. Check the printer and paper, then try again.")
+                .positive("OK", null)
+                .show();
+    }
+
     public static String toFourDigitString(int value) {
         if (value < 0 || value > 9999) {
-            throw new IllegalArgumentException("Value must be between 0 and 9999");
+            return Integer.toString(value); // more than 9999 tickets in a day: print the full number
         }
         String s = Integer.toString(value);
         int len = s.length();
@@ -1153,15 +1093,15 @@ public class Adult_Ticket_Fragment extends Fragment {
     //Shows the total amount for the current Shift
     @SuppressLint("SetTextI18n")
     private void showTotalAmountForToday(@Nullable TextView targetView) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            AppDatabase db = AppDatabase.getInstance(requireContext());
+        AppExecutors.runBg(() -> {
+            AppDatabase db = AppDatabase.getInstance(appCtx);
 //            String today = Prefs.getDayDate(requireContext());
-            String busNo = Prefs.getSelectedBus(requireContext());
+            String busNo = Prefs.getSelectedBus(appCtx);
 
 //            final Integer[] total = {db.ticketDao().getTotalAmountForDate(today, busNo)};
             final Integer[] total = {db.ticketDao().getTotalAmountForLastShift(busNo)};
 
-            requireActivity().runOnUiThread(() -> {
+            runOnUiSafe(() -> {
                 if (total[0] == null) total[0] = 0;
 
                 if (targetView != null) {

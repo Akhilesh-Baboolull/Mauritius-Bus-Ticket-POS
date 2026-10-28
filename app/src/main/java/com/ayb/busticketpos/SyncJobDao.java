@@ -44,6 +44,10 @@ public interface SyncJobDao {
     @Query("SELECT COUNT(*) FROM sync_queue")
     int count();
 
+    /** Newest first, for the Settings "pending items" viewer. */
+    @Query("SELECT * FROM sync_queue ORDER BY id DESC LIMIT :limit")
+    List<SyncJob> fetchNewest(int limit);
+
     @Query("DELETE FROM sync_queue WHERE endpoint = :endpoint AND retryCount >= :maxRetries")
     int deleteOverRetries(String endpoint, int maxRetries);
 

@@ -32,17 +32,17 @@ public class UnlockReceiver extends BroadcastReceiver {
                         app.startActivity(home);
                         Log.d("UnlockReceiver", "Post-update: launched Home (our app) after unlock");
                     } catch (Exception e) {
-                        Log.e("UnlockReceiver", "Failed to bring app to front after unlock", e);
+                        AppLog.e("UnlockReceiver", "Failed to bring app to front after unlock", e);
                     }
                 }, POST_UNLOCK_DELAY_MS);
             }
             try {
                 LocationForegroundService.startIfNeeded(context);
             } catch (Exception e) {
-                Log.e("UnlockReceiver", "LocationForegroundService start failed", e);
+                AppLog.e("UnlockReceiver", "LocationForegroundService start failed", e);
             }
         } catch (Exception e) {
-            Log.e("UnlockReceiver", "onReceive failed", e);
+            AppLog.e("UnlockReceiver", "onReceive failed", e);
         }
     }
 }

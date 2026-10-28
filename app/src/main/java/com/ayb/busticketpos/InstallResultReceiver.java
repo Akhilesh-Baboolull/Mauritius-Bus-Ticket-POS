@@ -55,14 +55,14 @@ public class InstallResultReceiver extends BroadcastReceiver {
                 r.put("event", "INSTALL_FAILED");
                 r.put("errorCode", status);
                 if (msg != null) r.put("message", msg);
-                Log.e(TAG, "Install failed status=" + status + " msg=" + msg);
+                AppLog.e(TAG, "Install failed status=" + status + " msg=" + msg);
                 final String crashMsg = "INSTALL_FAILED status=" + status + " message=" + (msg != null ? msg : "");
                 enqueueOnBackground(context, r, msg);
                 Executors.newSingleThreadExecutor().execute(() ->
                         CrashLogger.logUpdateEvent(TAG, crashMsg));
             }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to report install result", e);
+            AppLog.e(TAG, "Failed to report install result", e);
             CrashLogger.logUpdateEvent(TAG, "Failed to report install result", e);
         }
     }
@@ -73,7 +73,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
             try {
                 SyncQueueUtil.enqueue(context, ApiEndpoints.REPORT_URL, r, msg);
             } catch (Exception e) {
-                Log.e(TAG, "Failed to report install result", e);
+                AppLog.e(TAG, "Failed to report install result", e);
                 CrashLogger.logUpdateEvent(TAG, "Failed to report install result", e);
             }
         });
@@ -100,7 +100,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
                     am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
                     scheduledExact = true;
                 } catch (SecurityException e) {
-                    Log.w(TAG, "Exact relaunch alarm not allowed, using inexact", e);
+                    AppLog.w(TAG, "Exact relaunch alarm not allowed, using inexact", e);
                 }
             }
             if (!scheduledExact) {
@@ -112,7 +112,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
             }
             Log.i(TAG, "Relaunch alarm set for " + (RELAUNCH_ALARM_DELAY_MS / 1000) + "s");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to set relaunch alarm", e);
+            AppLog.e(TAG, "Failed to set relaunch alarm", e);
             CrashLogger.logUpdateEvent(TAG, "Failed to set relaunch alarm: " + e.getMessage(), e);
         }
     }
@@ -143,7 +143,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
             context.startActivity(buildRelaunchIntent(context));
             Log.i(TAG, "App relaunch intent sent");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to relaunch app after update", e);
+            AppLog.e(TAG, "Failed to relaunch app after update", e);
             CrashLogger.logUpdateEvent(TAG, "INSTALL_SUCCESS but failed to relaunch app: " + e.getMessage(), e);
         }
     }

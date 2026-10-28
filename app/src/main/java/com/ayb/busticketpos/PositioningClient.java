@@ -66,7 +66,7 @@ public final class PositioningClient {
             } catch (Exception e) {
                 // Do not queue every failed ping while offline — that filled sync_queue and OOM'd the device.
                 // Latest location is sent on the next successful interval when online.
-                Log.w(TAG, "send skipped (offline or server error): " + e.getMessage());
+                AppLog.w(TAG, "send skipped (offline or server error): " + e.getMessage());
                 if (cb != null) cb.onFail(e.getMessage());
             }
         });

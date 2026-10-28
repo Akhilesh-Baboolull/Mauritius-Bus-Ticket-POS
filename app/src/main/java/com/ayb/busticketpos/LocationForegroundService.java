@@ -74,19 +74,42 @@ public class LocationForegroundService extends Service {
     }
 
     public static void start(Context ctx) {
+        Context app = ctx.getApplicationContext();
+        startServiceSafely(app, new Intent(app, LocationForegroundService.class));
+    }
+
+    /**
+     * Starting a location foreground service without location permission makes the system kill
+     * the app (the failure cannot be caught inside the service), so check first. Every other
+     * start failure (background-start limits etc.) is logged instead of crashing the caller.
+     */
+    private static void startServiceSafely(Context app, Intent i) {
         try {
-            Context app = ctx.getApplicationContext();
-            Intent i = new Intent(app, LocationForegroundService.class);
+            boolean hasLocation =
+                    androidx.core.content.ContextCompat.checkSelfPermission(app,
+                            android.Manifest.permission.ACCESS_FINE_LOCATION)
+                            == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    || androidx.core.content.ContextCompat.checkSelfPermission(app,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                            == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            if (!hasLocation) {
+                AppLog.w("LocationFG", "Location permission missing — service not started");
+                return;
+            }
             app.startForegroundService(i);
-        } catch (Exception e) {
-            android.util.Log.e("LocationFG", "start failed", e);
+        } catch (Throwable e) {
+            AppLog.e("LocationFG", "Could not start location service (" + i.getAction() + ")", e);
         }
     }
 
     public static void stop(Context ctx) {
         Context app = ctx.getApplicationContext();
         Intent i = new Intent(app, LocationForegroundService.class).setAction(ACTION_STOP);
-        app.startForegroundService(i);
+        try {
+            app.startForegroundService(i);
+        } catch (Throwable e) {
+            AppLog.e("LocationFG", "Could not stop location service", e);
+        }
     }
 
     public static void sendNow(Context ctx) {
@@ -100,13 +123,13 @@ public class LocationForegroundService extends Service {
         if (snapshot != null) {
             snapshot.attachTo(i);
         }
-        app.startForegroundService(i);
+        startServiceSafely(app, i);
     }
 
     public static void sendOnDayEnd(Context ctx) {
         Context app = ctx.getApplicationContext();
         Intent i = new Intent(app, LocationForegroundService.class).setAction(ACTION_SEND_DAY_END);
-        app.startForegroundService(i);
+        startServiceSafely(app, i);
     }
 
     // ---------------------------------------------------------------------
@@ -119,7 +142,7 @@ public class LocationForegroundService extends Service {
             startForeground(NOTIF_ID, buildNotif("Tracking enabled"));
             Log.i(TAG, "Foreground notification posted; deferring location client init");
         } catch (Exception e) {
-            Log.e(TAG, "onCreate: failed to start foreground", e);
+            AppLog.e(TAG, "onCreate: failed to start foreground", e);
             stopSelf();
             return;
         }
@@ -138,14 +161,14 @@ public class LocationForegroundService extends Service {
                             postLocation(loc, false, false);
                             applyModeFromDbIfNeeded(false);
                         } catch (Exception e) {
-                            Log.e(TAG, "onLocationResult failed", e);
+                            AppLog.e(TAG, "onLocationResult failed", e);
                         }
                     }
                 };
                 applyModeFromDbIfNeeded(true);
                 flushPendingImmediateSends();
             } catch (Exception e) {
-                Log.e(TAG, "Deferred init failed", e);
+                AppLog.e(TAG, "Deferred init failed", e);
             }
         });
     }
@@ -157,7 +180,7 @@ public class LocationForegroundService extends Service {
             startForeground(NOTIF_ID, buildNotif("Tracking enabled"));
             Log.d(TAG, "onStartCommand: foreground notification ensured");
         } catch (Exception e) {
-            Log.w(TAG, "onStartCommand: startForeground failed", e);
+            AppLog.w(TAG, "onStartCommand: startForeground failed", e);
         }
 
         // Handle action only when present (first start often has null intent/action).
@@ -182,7 +205,7 @@ public class LocationForegroundService extends Service {
             }
         }
 
-        try { applyModeFromDbIfNeeded(false); } catch (Exception e) { Log.e(TAG, "applyModeFromDbIfNeeded failed", e); }
+        try { applyModeFromDbIfNeeded(false); } catch (Exception e) { AppLog.e(TAG, "applyModeFromDbIfNeeded failed", e); }
 
         return START_STICKY;
     }
@@ -217,10 +240,10 @@ public class LocationForegroundService extends Service {
                     fused.requestLocationUpdates(req, callback, getMainLooper());
                     Log.d(TAG, "Mode applied dayActive=" + dayActive + " interval=" + (dayActive ? "30s" : "5min"));
                 } catch (SecurityException se) {
-                    Log.e(TAG, "Missing location permission", se);
+                    AppLog.e(TAG, "Missing location permission", se);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "applyModeFromDbIfNeeded worker failed", e);
+                AppLog.e(TAG, "applyModeFromDbIfNeeded worker failed", e);
             }
         });
     }
@@ -260,7 +283,7 @@ public class LocationForegroundService extends Service {
         try {
             sendImmediateOnce(true, dayEnded, snapshot);
         } catch (Exception e) {
-            Log.e(TAG, "requestImmediateSend failed dayEnded=" + dayEnded, e);
+            AppLog.e(TAG, "requestImmediateSend failed dayEnded=" + dayEnded, e);
         }
     }
 
@@ -284,7 +307,7 @@ public class LocationForegroundService extends Service {
                     sendImmediateOnce(true, true, null);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "flushPendingImmediateSends failed", e);
+                AppLog.e(TAG, "flushPendingImmediateSends failed", e);
             }
         });
     }
@@ -308,16 +331,16 @@ public class LocationForegroundService extends Service {
                                     try {
                                         if (last != null) postLocation(last, forceRefreshState, dayEnded);
                                     } catch (Exception e) {
-                                        Log.e(TAG, "getLastLocation callback failed", e);
+                                        AppLog.e(TAG, "getLastLocation callback failed", e);
                                     }
                                 });
                             }
                         } catch (Exception e) {
-                            Log.e(TAG, "sendImmediateOnce callback failed", e);
+                            AppLog.e(TAG, "sendImmediateOnce callback failed", e);
                         }
                     });
         } catch (Exception e) {
-            Log.e(TAG, "sendImmediateOnce failed", e);
+            AppLog.e(TAG, "sendImmediateOnce failed", e);
         }
     }
 
@@ -339,7 +362,7 @@ public class LocationForegroundService extends Service {
                     tenantId  = Integer.parseInt(tenantStr != null ? tenantStr.trim() : "0");
                     machineId = Integer.parseInt(machineStr != null ? machineStr.trim() : "0");
                 } catch (NumberFormatException e) {
-                    Log.w(TAG, "Invalid tenant/machine id, skip send");
+                    AppLog.w(TAG, "Invalid tenant/machine id, skip send");
                     return;
                 }
 
@@ -391,7 +414,7 @@ public class LocationForegroundService extends Service {
                         null
                 );
             } catch (Exception e) {
-                Log.e(TAG, "postLocation worker failed", e);
+                AppLog.e(TAG, "postLocation worker failed", e);
             }
         });
     }
@@ -412,7 +435,7 @@ public class LocationForegroundService extends Service {
             cachedAtMs = now;
             return fresh;
         } catch (Exception e) {
-            Log.e(TAG, "getState failed", e);
+            AppLog.e(TAG, "getState failed", e);
             return BgState.inactive();
         }
     }
@@ -449,7 +472,7 @@ public class LocationForegroundService extends Service {
             );
             nm.createNotificationChannel(ch);
         } catch (Exception e) {
-            Log.e(TAG, "ensureChannel failed", e);
+            AppLog.e(TAG, "ensureChannel failed", e);
         }
     }
 
@@ -463,7 +486,7 @@ public class LocationForegroundService extends Service {
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .build();
         } catch (Exception e) {
-            Log.e(TAG, "buildNotif failed", e);
+            AppLog.e(TAG, "buildNotif failed", e);
             return new NotificationCompat.Builder(this, CH_ID).setContentTitle("Bus Ticket POS").setContentText(text).build();
         }
     }

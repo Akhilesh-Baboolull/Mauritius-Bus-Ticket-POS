@@ -29,7 +29,7 @@ public class DailyUpdateBackupWorker extends Worker {
                 UpdateScheduler.enqueueCheckOnly(ctx, true);
                 android.util.Log.i("DailyUpdateBackup", "Enqueued check-only update (last check > 20h ago)");
             } catch (Exception e) {
-                android.util.Log.w("DailyUpdateBackup", "Enqueue failed", e);
+                AppLog.w("DailyUpdateBackup", "Enqueue failed", e);
                 return Result.retry();
             }
         }

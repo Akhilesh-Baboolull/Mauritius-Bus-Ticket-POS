@@ -15,10 +15,14 @@ public class InternetEnforcerReceiver extends BroadcastReceiver {
     @SuppressLint("UnsafeProtectedBroadcastReceiver")
     @Override
     public void onReceive(Context context, Intent intent) {
-        Context app = context.getApplicationContext();
-        enforce(app);
-        if (SyncQueueMaintenance.isOnline(app)) {
-            SyncQueueMaintenance.pruneAndScheduleDrainWhenOnline(app, true);
+        try {
+            Context app = context.getApplicationContext();
+            enforce(app);
+            if (SyncQueueMaintenance.isOnline(app)) {
+                SyncQueueMaintenance.pruneAndScheduleDrainWhenOnline(app, true);
+            }
+        } catch (Throwable t) {
+            AppLog.e("InternetEnforcer", "onReceive failed", t);
         }
     }
 
@@ -26,7 +30,14 @@ public class InternetEnforcerReceiver extends BroadcastReceiver {
         ComponentName admin = new ComponentName(context, MyDeviceAdminReceiver.class);
         DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
 
-        if (dpm != null && dpm.isDeviceOwnerApp(context.getPackageName())) {
+        boolean deviceOwner;
+        try {
+            deviceOwner = dpm != null && dpm.isDeviceOwnerApp(context.getPackageName());
+        } catch (Throwable t) {
+            AppLog.e("InternetEnforcer", "Device owner check failed", t);
+            deviceOwner = false;
+        }
+        if (deviceOwner) {
             try {
                 // 🧱 1️⃣ Prevent user from enabling Airplane Mode
                 dpm.addUserRestriction(admin, UserManager.DISALLOW_AIRPLANE_MODE);
@@ -40,10 +51,10 @@ public class InternetEnforcerReceiver extends BroadcastReceiver {
                 dpm.addUserRestriction(admin, UserManager.DISALLOW_CONFIG_WIFI);
                 Log.d("InternetEnforcer", "User restriction: DISALLOW_CONFIG_WIFI added");
             } catch (Exception e) {
-                Log.e("InternetEnforcer", "Failed to apply restrictions", e);
+                AppLog.e("InternetEnforcer", "Failed to apply restrictions", e);
             }
         } else {
-            Log.w("InternetEnforcer", "App is not Device Owner; cannot apply restrictions");
+            AppLog.w("InternetEnforcer", "App is not Device Owner; cannot apply restrictions");
         }
 
         // ✅ 4️⃣ Ensure Wi-Fi is ON (still allowed for Device Owner)
@@ -54,7 +65,7 @@ public class InternetEnforcerReceiver extends BroadcastReceiver {
                 Log.d("InternetEnforcer", "Wi-Fi enabled");
             }
         } catch (Exception e) {
-            Log.e("InternetEnforcer", "Wi-Fi enable failed", e);
+            AppLog.e("InternetEnforcer", "Wi-Fi enable failed", e);
         }
     }
 }

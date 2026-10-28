@@ -13,7 +13,14 @@ public final class AppExecutors {
 
     private AppExecutors() {}
 
+    /** An exception escaping a background task would kill the app, so every task is guarded and logged. */
     public static void runBg(Runnable task) {
-        BG.execute(task);
+        BG.execute(() -> {
+            try {
+                task.run();
+            } catch (Throwable t) {
+                AppLog.e("AppExecutors", "Background task failed", t);
+            }
+        });
     }
 }

@@ -1,53 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Destination picker (ticket fragments) and trip picker (Report). Card style matches AppDialog. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_card"
+    android:orientation="vertical"
+    android:paddingLeft="12dp"
+    android:paddingTop="20dp"
+    android:paddingRight="12dp"
+    android:paddingBottom="16dp">
 
+    <TextView
+        android:id="@+id/tariff_dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="Select Destination"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_text_dialog_title"
+        android:textStyle="bold" />
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="561dp">
+        android:layout_height="620dp"
+        android:layout_marginTop="8dp">
 
         <LinearLayout
             android:id="@+id/container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
-
     </ScrollView>
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="225dp"
-        android:gravity="center_horizontal|center_vertical"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp">
 
-        <Button
-            android:id="@+id/btn_tariff_print"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="30dp"
-            android:layout_marginRight="30dp"
-            android:layout_marginBottom="30dp"
-            android:backgroundTint="#FF0101"
-            android:text="ISSUE TICKET"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
-
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_close"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="30dp"
-            android:layout_marginRight="30dp"
-            android:backgroundTint="#2196F3"
-            android:text="Close"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            style="@style/AppDialogSecondaryButton"
+            android:text="Close" />
 
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="0dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_tariff_print"
+            style="@style/AppDialogPrimaryButton"
+            android:text="Issue Ticket"
+            app:backgroundTint="#D32F2F" />
     </LinearLayout>
-
 </LinearLayout>

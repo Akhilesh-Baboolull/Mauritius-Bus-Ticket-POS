@@ -64,7 +64,7 @@ public class SyncWorker extends Worker {
             }
             if (!ApiEndpoints.POSITIONING.equals(job.endpoint)
                     && job.retryCount >= SyncQueueMaintenance.MAX_BUSINESS_RETRIES) {
-                Log.w(TAG, "Giving up after max retries id=" + job.id + " " + job.endpoint);
+                AppLog.w(TAG, "Giving up after max retries id=" + job.id + " " + job.endpoint);
                 dao.deleteById(job.id);
                 continue;
             }
@@ -92,7 +92,7 @@ public class SyncWorker extends Worker {
                 try {
                     resp = HttpUtil.parseJsonObjectLenient(respStr);
                 } catch (JSONException je) {
-                    Log.e(TAG, job.endpoint + " parse failed: " + je.getMessage());
+                    AppLog.e(TAG, job.endpoint + " parse failed: " + je.getMessage());
                     anyFailed = true;
                     dao.markFailed(job.id, je.getMessage());
                     continue;

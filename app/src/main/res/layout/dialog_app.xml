@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared card dialog used across the app (see AppDialog.java) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_card"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <FrameLayout
+        android:id="@+id/app_dialog_icon_bg"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/bg_icon_circle">
+
+        <ImageView
+            android:id="@+id/app_dialog_icon"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_info_24" />
+
+        <ProgressBar
+            android:id="@+id/app_dialog_progress"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="#031FB8"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/app_dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_text_dialog_title"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/app_dialog_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textColor="#44474E"
+        android:textSize="19sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/app_dialog_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/app_dialog_negative"
+            style="@style/AppDialogSecondaryButton"
+            android:visibility="gone" />
+
+        <Space
+            android:id="@+id/app_dialog_button_gap"
+            android:layout_width="12dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/app_dialog_positive"
+            style="@style/AppDialogPrimaryButton"
+            android:text="OK" />
+    </LinearLayout>
+</LinearLayout>

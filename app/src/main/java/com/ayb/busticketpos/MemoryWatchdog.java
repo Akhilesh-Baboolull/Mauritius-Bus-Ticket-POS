@@ -60,14 +60,14 @@ public final class MemoryWatchdog {
                         if (mb >= WARNING_MB && mb < CRITICAL_MB) {
                             if (!warnedOnce) {
                                 warnedOnce = true;
-                                Log.w(TAG, "High RAM usage: " + mb + " MB — trimming sync queue");
+                                AppLog.w(TAG, "High RAM usage: " + mb + " MB — trimming sync queue");
                                 SyncQueueMaintenance.pruneAggressive(appCtx);
                             }
                             continue;
                         }
 
                         // CRITICAL → restart service silently
-                        Log.e(TAG, "CRITICAL RAM USAGE: " + mb + " MB — trimming queue + restarting service");
+                        AppLog.e(TAG, "CRITICAL RAM USAGE: " + mb + " MB — trimming queue + restarting service");
                         SyncQueueMaintenance.pruneAggressive(appCtx);
 
                         restartLocationService();
@@ -75,7 +75,7 @@ public final class MemoryWatchdog {
                     } catch (InterruptedException ie) {
                         return; // exiting
                     } catch (Throwable th) {
-                        Log.e(TAG, "Watchdog error", th);
+                        AppLog.e(TAG, "Watchdog error", th);
                     }
                 }
             }

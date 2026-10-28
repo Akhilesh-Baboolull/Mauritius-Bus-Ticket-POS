@@ -1,0 +1,27 @@
+# Store text files with LF in the repository; Git checks them out with the
+# platform's native line endings. Works the same regardless of core.autocrlf.
+* text=auto
+
+# Shell scripts must stay LF (CRLF breaks them on Linux / CI).
+gradlew          text eol=lf
+*.sh             text eol=lf
+
+# Windows scripts must stay CRLF.
+*.bat            text eol=crlf
+*.cmd            text eol=crlf
+
+# Binaries: never convert or diff.
+*.jar            binary
+*.so             binary
+*.png            binary
+*.webp           binary
+*.jpg            binary
+*.jpeg           binary
+*.gif            binary
+*.ico            binary
+*.apk            binary
+*.aab            binary
+*.jks            binary
+*.keystore       binary
+*.p12            binary
+keystore/aybway_keystore binary

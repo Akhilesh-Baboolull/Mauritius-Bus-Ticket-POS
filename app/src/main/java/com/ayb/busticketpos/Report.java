@@ -1,7 +1,6 @@
 package com.ayb.busticketpos;
 
 import android.annotation.SuppressLint;
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -26,8 +25,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDialog;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -72,8 +71,12 @@ public class Report extends AppCompatActivity {
             return insets;
         });
 
-        DriverManager mDriverManager = DriverManager.getInstance();
-        mPrinter       = mDriverManager.getPrinter();
+        try {
+            mPrinter = DriverManager.getInstance().getPrinter();
+        } catch (Throwable t) {
+            mPrinter = null;
+            AppLog.e("Printer", "Printer SDK unavailable", t);
+        }
 
         report_type = findViewById(R.id.report_type);
         Button trip_report = findViewById(R.id.trip_report);
@@ -100,7 +103,11 @@ public class Report extends AppCompatActivity {
 
         report_type.setOnCheckedChangeListener((group, checkedId) -> {
 
-            RadioButton rb = findViewById(checkedId);
+            RadioButton rb = checkedId != -1 ? findViewById(checkedId) : null;
+            if (rb == null || rb.getTag() == null) {
+                rb_tag = null;
+                return;
+            }
             rb_tag = rb.getTag().toString();
 
             if(!rb_tag.equals("custom_trip")){
@@ -131,6 +138,7 @@ public class Report extends AppCompatActivity {
 
 
         btn_print.setOnClickListener(v -> {
+            if (rb_tag == null) return;
             switch (rb_tag) {
                 case "current_trip" -> {
                     if (Prefs.getTripStatus(this) == 1) {
@@ -162,85 +170,19 @@ public class Report extends AppCompatActivity {
     }
 
     private void error_dialog(String msg){
-
-        SpannableString sizedMsg = new SpannableString(msg);
-        // the second parameter "true" means "treat the 18 as SP, not pixels"
-        sizedMsg.setSpan(
-                new AbsoluteSizeSpan(34, true),
-                0,                                // start
-                msg.length(),                     // end
-                Spannable.SPAN_INCLUSIVE_INCLUSIVE
-        );
-        sizedMsg.setSpan(
-                new AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER),
-                0, msg.length(),
-                Spanned.SPAN_INCLUSIVE_INCLUSIVE
-        );
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setMessage(sizedMsg)
-                .setPositiveButton("OK", null)
+        AppDialog.with(this)
+                .type(AppDialog.Type.WARNING)
+                .title(msg)
+                .positive("OK", null)
+                .cancelable(false)
                 .show();
-
-        // 🚫 Prevent dismiss when touching outside or pressing Back
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setCancelable(false);
-
-        Button okButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-
-        // • Increase text size to 20sp
-        okButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-
-        // • Change text color to white (for contrast)
-        okButton.setTextColor(Color.WHITE);
-
-        // • Paint its background blue
-        okButton.setBackgroundColor(Color.BLUE);
-
-        // (Optional) If you want rounded corners or padding:
-        int pad = (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 20, getResources().getDisplayMetrics()
-        );
-        okButton.setPadding(pad, pad, pad, pad);
-        okButton.setAllCaps(false);
-        LinearLayout parent = (LinearLayout) okButton.getParent();
-        parent.setGravity(Gravity.CENTER);
-
-        // (Optional) If you want the button to stretch across and then center its text:
-        LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) okButton.getLayoutParams();
-        params.width = LinearLayout.LayoutParams.WRAP_CONTENT;
-        okButton.setLayoutParams(params);
-        okButton.setGravity(Gravity.CENTER);
-
-        TextView messageView = dialog.findViewById(android.R.id.message);
-        if (messageView != null) {
-            // 3️⃣ convert 16dp to pixels
-            int extraPx = (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP,
-                    16,
-                    getResources().getDisplayMetrics()
-            );
-
-            // 4️⃣ add it to the bottom padding
-            messageView.setPadding(
-                    messageView.getPaddingLeft(),
-                    messageView.getPaddingTop(),
-                    messageView.getPaddingRight(),
-                    messageView.getPaddingBottom() + extraPx
-            );
-        }
-        Objects.requireNonNull(dialog.getWindow()).setBackgroundDrawable(
-                new ColorDrawable(Color.parseColor("#FFAA00"))
-        );
-
-
     }
 
     private void print_collection_report() {
 
         Prefs.incrementSummary(this);
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             AppDatabase db = AppDatabase.getInstance(this);
 
             TicketDayEntity thisday = db.ticketDao().getLastDay();
@@ -251,7 +193,7 @@ public class Report extends AppCompatActivity {
                         thisday.id
                 );
             } else {
-                android.util.Log.w("Report", "No TicketDayEntity found — skipping recordSummaryReportCount()");
+                AppLog.w("Report", "No TicketDayEntity found — skipping recordSummaryReportCount()");
                 return;
             }
 
@@ -260,7 +202,7 @@ public class Report extends AppCompatActivity {
             String today = new SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(new Date());
             List<TicketDayEntity> allDays = db.ticketDao().getDaysForDate(today);
             if (allDays == null || allDays.isEmpty()) {
-                Log.w("Report", "No day entries found for today");
+                AppLog.w("Report", "No day entries found for today");
                 return;
             }
 
@@ -299,7 +241,7 @@ public class Report extends AppCompatActivity {
                         summary.endTicketNo = lastTicket.ticketNo;
 
                         for (TicketEntity t : tickets) {
-                            switch (t.fareType.toLowerCase()) {
+                            switch (t.fareType != null ? t.fareType.toLowerCase() : "") {
                                 case "adult":
                                     summary.adultCount++;
                                     summary.adultTotal += t.amount;
@@ -341,17 +283,45 @@ public class Report extends AppCompatActivity {
                 daySummaries.add(ds);
             }
 
-            runOnUiThread(() -> collection_report_printer(daySummaries, reportsCount));
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                collection_report_printer(daySummaries, reportsCount);
+            });
         });
+    }
+
+    /** Runs printer code on the UI thread; a missing or failing printer shows an error instead of crashing. */
+    private void runPrintOnUi(Runnable printing) {
+        runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (mPrinter == null) {
+                showPrinterError(null);
+                return;
+            }
+            try {
+                printing.run();
+            } catch (Throwable t) {
+                showPrinterError(t);
+            }
+        });
+    }
+
+    /** Printer missing or failed: log it and tell the operator instead of crashing. */
+    private void showPrinterError(@androidx.annotation.Nullable Throwable t) {
+        AppLog.e("Printer", "Report printing failed", t);
+        if (isFinishing() || isDestroyed()) return;
+        AppDialog.with(this)
+                .type(AppDialog.Type.ERROR)
+                .title("Printer error")
+                .message("The report could not be printed. Check the printer and paper, then try again.")
+                .positive("OK", null)
+                .show();
     }
 
 
     private void collection_report_printer(List<DaySummary> daySummaries, ReportsCountSummary dayReportCount) {
         // Show "Printing..." dialog
-        ProgressDialog progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Printing...");
-        progressDialog.setCancelable(false);
-        progressDialog.show();
+        AppCompatDialog progressDialog = AppDialog.showProgress(this, "Printing...");
 
         // Run the entire print logic in background thread
         new Thread(() -> {
@@ -592,15 +562,20 @@ public class Report extends AppCompatActivity {
 
                 // ✅ Done: close popup on UI thread
                 runOnUiThread(() -> {
-                    progressDialog.dismiss();
-                    Toast.makeText(this, "Printing complete", Toast.LENGTH_SHORT).show();
+                    AppDialog.dismissSafely(progressDialog);
+                    if (!isFinishing() && !isDestroyed()) {
+                        Toast.makeText(this, "Printing complete", Toast.LENGTH_SHORT).show();
+                    }
                 });
 
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 CrashLogger.logError("Printer", e);
+                AppLog.e("Printer", "Collection report printing failed", e);
                 runOnUiThread(() -> {
-                    progressDialog.dismiss();
-                    Toast.makeText(this, "Printing failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    AppDialog.dismissSafely(progressDialog);
+                    if (!isFinishing() && !isDestroyed()) {
+                        Toast.makeText(this, "Printing failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
                 });
             }
         }).start();
@@ -611,33 +586,14 @@ public class Report extends AppCompatActivity {
 
 
     private void showWarningDialog() {
-        // 1️⃣ Inflate your custom layout
-        View dialogView = LayoutInflater.from(this).inflate(R.layout.warning_dialog, null);
-
-        // 2️⃣ Create the AlertDialog
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setView(dialogView)
-                .setCancelable(false)
-                .create();
-
-        // 3️⃣ Get button references
-        Button btnNo = dialogView.findViewById(R.id.button);
-        Button btnYes = dialogView.findViewById(R.id.button2);
-
-        // 4️⃣ Button listeners
-        btnNo.setOnClickListener(v -> {
-            // ❌ User does not want to continue
-            dialog.dismiss();
-        });
-
-        btnYes.setOnClickListener(v -> {
-            // ✅ User wants to proceed
-            print_collection_report();
-            dialog.dismiss();
-        });
-
-        // 5️⃣ Show dialog
-        dialog.show();
+        AppDialog.with(this)
+                .type(AppDialog.Type.WARNING)
+                .title("Day not ended yet!")
+                .message("Do you want to continue?")
+                .negative("No", null)
+                .positive("Yes", this::print_collection_report)
+                .cancelable(false)
+                .show();
     }
 
 
@@ -655,7 +611,7 @@ public class Report extends AppCompatActivity {
 
     @SuppressLint({"ResourceAsColor", "SetTextI18n"})
     private void show_all_trips() {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             AppDatabase db = AppDatabase.getInstance(this);
 //            String today = Prefs.getDayDate(this);
 //            String busNo = Prefs.getSelectedBus(this);
@@ -668,16 +624,16 @@ public class Report extends AppCompatActivity {
             List<TripEntity> allTrips = db.ticketDao().getTripsForDay(day.id);
 
             runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
                 View dlgView = LayoutInflater.from(this)
                         .inflate(R.layout.dialog_tariffs, null);
 
                 LinearLayout listContainer = dlgView.findViewById(R.id.container);
                 listContainer.removeAllViews();
+                ((TextView) dlgView.findViewById(R.id.tariff_dialog_title)).setText("Select Trip");
 
                 // Step 1: Create the dialog FIRST so we can access it in the loop
-                AlertDialog dialog = new AlertDialog.Builder(this)
-                        .setView(dlgView)
-                        .create();
+                AppCompatDialog dialog = AppDialog.wrap(this, dlgView, 0.95f);
 
                 // Step 2: Build the list
                 for (TripEntity trip : allTrips) {
@@ -703,7 +659,7 @@ public class Report extends AppCompatActivity {
                 btnPrint.setVisibility(View.GONE); // Not used
                 btnClose.setOnClickListener(v -> dialog.dismiss());
 
-                dialog.show();
+                AppDialog.showSafely(this, dialog);
             });
         });
     }
@@ -713,7 +669,7 @@ public class Report extends AppCompatActivity {
         String currentDate = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date());
         String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             AppDatabase db = AppDatabase.getInstance(this);
 
             // Get Day record
@@ -733,7 +689,7 @@ public class Report extends AppCompatActivity {
 
             db.reportCountDao().recordAllTripsCount(Prefs.getAllTripsCount(this), day.id);
 
-            runOnUiThread(() -> {
+            runPrintOnUi(() -> {
                 int total_amount;
 
                 PrnStrFormat fmt = new PrnStrFormat();
@@ -832,12 +788,19 @@ public class Report extends AppCompatActivity {
                 "HH:mm:ss", Locale.getDefault()
         ).format(new Date());
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             AppDatabase db = AppDatabase.getInstance(this);
 
             int tripNo = Prefs.getTripCount(this);
 
             TicketDayEntity day = db.ticketDao().getLastDay();
+            if (day == null) {
+                AppLog.w("Report", "No day found — current trip report skipped");
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) error_dialog("No current Trip!");
+                });
+                return;
+            }
 
             int tripId = db.ticketDao().getTripId(day.id, tripNo);
 
@@ -847,7 +810,7 @@ public class Report extends AppCompatActivity {
             db.reportCountDao().recordCurrentTripCount(Prefs.getCurrentTripCount(this), day.id);
 
             // Step 4: Switch to main thread to update printer
-            runOnUiThread(() -> {
+            runPrintOnUi(() -> {
 
                 PrnStrFormat fmt = new PrnStrFormat();
 
@@ -944,7 +907,7 @@ public class Report extends AppCompatActivity {
                 "HH:mm:ss", Locale.getDefault()
         ).format(new Date());
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        AppExecutors.runBg(() -> {
             AppDatabase db = AppDatabase.getInstance(this);
 
             List<TicketEntity> tickets = db.ticketDao().getTicketsForTrip(tripNo);
@@ -956,10 +919,14 @@ public class Report extends AppCompatActivity {
 
             TicketDayEntity day = db.ticketDao().getLastDay();
 
-            db.reportCountDao().recordCustomTripCount(Prefs.getCustomTripCount(this), day.id);
+            if (day != null) {
+                db.reportCountDao().recordCustomTripCount(Prefs.getCustomTripCount(this), day.id);
+            } else {
+                AppLog.w("Report", "No day found — custom trip report count not recorded");
+            }
 
                     // Step 4: Switch to main thread to update printer
-            runOnUiThread(() -> {
+            runPrintOnUi(() -> {
 
                 PrnStrFormat fmt = new PrnStrFormat();
 

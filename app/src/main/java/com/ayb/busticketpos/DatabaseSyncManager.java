@@ -51,7 +51,7 @@ public class DatabaseSyncManager {
                                  boolean force, @Nullable SyncListener listener) {
         synchronized (DatabaseSyncManager.class) {
             if (isRunning) {
-                Log.w(TAG, "Sync already running — skipping");
+                AppLog.w(TAG, "Sync already running — skipping");
                 notifyListener(listener, false, "Sync already in progress");
                 return;
             }
@@ -71,7 +71,7 @@ public class DatabaseSyncManager {
                     userId = Integer.parseInt(PrefsSecure.getTenantId(ctx));
                     machineId = Integer.parseInt(PrefsSecure.getMachineId(ctx));
                 } catch (Exception e) {
-                    Log.e(TAG, "Machine not registered / invalid IDs", e);
+                    AppLog.e(TAG, "Machine not registered / invalid IDs", e);
                     main.post(() -> Toast.makeText(ctx, "Machine Not Registered!", Toast.LENGTH_LONG).show());
                     return;
                 }
@@ -114,13 +114,13 @@ public class DatabaseSyncManager {
                 }
 
                 if (fetchError != null) {
-                    Log.w(TAG, "Master data fetch failed (" + fetchError + ") — keeping existing DB");
+                    AppLog.w(TAG, "Master data fetch failed (" + fetchError + ") — keeping existing DB");
                     userMessage = MSG_SYNC_FAILED;
                     return;
                 }
 
                 if (!isValidMasterData(tariffs, routesStages.routes, routesStages.stages, buses)) {
-                    Log.w(TAG, "Master data incomplete from server — keeping existing DB");
+                    AppLog.w(TAG, "Master data incomplete from server — keeping existing DB");
                     userMessage = MSG_SYNC_FAILED;
                     return;
                 }
@@ -150,7 +150,7 @@ public class DatabaseSyncManager {
                         + " buses=" + busesFinal.size());
 
             } catch (Throwable t) {
-                Log.e(TAG, "Unexpected sync error — keeping existing DB", t);
+                AppLog.e(TAG, "Unexpected sync error — keeping existing DB", t);
                 userMessage = MSG_SYNC_FAILED;
                 showCompletionToast = true;
             } finally {
@@ -161,7 +161,7 @@ public class DatabaseSyncManager {
                     main.post(() -> Toast.makeText(ctx, finalMessage, Toast.LENGTH_SHORT).show());
                 }
                 if (listener != null) {
-                    main.post(() -> listener.onComplete(finalSuccess, finalMessage));
+                    main.post(() -> runCallback(() -> listener.onComplete(finalSuccess, finalMessage)));
                 }
             }
         });
@@ -169,7 +169,16 @@ public class DatabaseSyncManager {
 
     private static void notifyListener(@Nullable SyncListener listener, boolean success, @Nullable String message) {
         if (listener == null) return;
-        new Handler(Looper.getMainLooper()).post(() -> listener.onComplete(success, message));
+        new Handler(Looper.getMainLooper()).post(() -> runCallback(() -> listener.onComplete(success, message)));
+    }
+
+    /** UI callbacks run on the main thread; an exception there would crash the app. */
+    private static void runCallback(Runnable r) {
+        try {
+            r.run();
+        } catch (Throwable t) {
+            AppLog.e(TAG, "Sync listener callback failed", t);
+        }
     }
 
     private static boolean isValidMasterData(List<TariffRange> tariffs,
@@ -187,18 +196,18 @@ public class DatabaseSyncManager {
         try {
             String json = HttpUtil.postJson(ApiEndpoints.MASTER_TARIFFS, body);
             if (json == null || json.trim().isEmpty()) {
-                Log.w(TAG, "Tariff fetch: empty response");
+                AppLog.w(TAG, "Tariff fetch: empty response");
                 return null;
             }
             Type type = new TypeToken<List<TariffRange>>() {}.getType();
             List<TariffRange> list = new Gson().fromJson(json, type);
             if (list == null || list.isEmpty()) {
-                Log.w(TAG, "Tariff fetch: no rows");
+                AppLog.w(TAG, "Tariff fetch: no rows");
                 return null;
             }
             return list;
         } catch (Throwable e) {
-            Log.e(TAG, "Tariff fetch failed", e);
+            AppLog.e(TAG, "Tariff fetch failed", e);
             return null;
         }
     }
@@ -218,7 +227,7 @@ public class DatabaseSyncManager {
         try {
             String json = HttpUtil.postJson(ApiEndpoints.ROUTES, body);
             if (json == null || json.trim().isEmpty()) {
-                Log.w(TAG, "Routes fetch: empty response");
+                AppLog.w(TAG, "Routes fetch: empty response");
                 return null;
             }
             Type type = new TypeToken<List<AppDatabase.RouteWithStages>>() {}.getType();
@@ -251,12 +260,12 @@ public class DatabaseSyncManager {
             }
 
             if (routes.isEmpty() || stages.isEmpty()) {
-                Log.w(TAG, "Routes fetch: routes=" + routes.size() + " stages=" + stages.size());
+                AppLog.w(TAG, "Routes fetch: routes=" + routes.size() + " stages=" + stages.size());
                 return null;
             }
             return new RoutesStagesBundle(routes, stages);
         } catch (Throwable e) {
-            Log.e(TAG, "Routes fetch failed", e);
+            AppLog.e(TAG, "Routes fetch failed", e);
             return null;
         }
     }
@@ -266,18 +275,18 @@ public class DatabaseSyncManager {
         try {
             String json = HttpUtil.postJson(ApiEndpoints.BUSES, body);
             if (json == null || json.trim().isEmpty()) {
-                Log.w(TAG, "Bus fetch: empty response");
+                AppLog.w(TAG, "Bus fetch: empty response");
                 return null;
             }
             Type type = new TypeToken<List<BusEntity>>() {}.getType();
             List<BusEntity> list = new Gson().fromJson(json, type);
             if (list == null || list.isEmpty()) {
-                Log.w(TAG, "Bus fetch: no rows");
+                AppLog.w(TAG, "Bus fetch: no rows");
                 return null;
             }
             return list;
         } catch (Throwable e) {
-            Log.e(TAG, "Bus fetch failed", e);
+            AppLog.e(TAG, "Bus fetch failed", e);
             return null;
         }
     }

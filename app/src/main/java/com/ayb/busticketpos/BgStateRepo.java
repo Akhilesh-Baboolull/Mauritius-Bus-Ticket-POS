@@ -26,7 +26,7 @@ public class BgStateRepo {
             TicketDayEntity day = db.ticketDao().getActiveDay();
             return isCurrentOperationalDay(ctx, day);
         } catch (Exception e) {
-            Log.w(TAG, "isDayActive failed (use inactive)", e);
+            AppLog.w(TAG, "isDayActive failed (use inactive)", e);
             return false;
         }
     }
@@ -59,7 +59,7 @@ public class BgStateRepo {
                     trimOrNull(trip.route)
             );
         } catch (Exception e) {
-            Log.w(TAG, "read failed (use inactive)", e);
+            AppLog.w(TAG, "read failed (use inactive)", e);
             return BgState.inactive();
         }
     }

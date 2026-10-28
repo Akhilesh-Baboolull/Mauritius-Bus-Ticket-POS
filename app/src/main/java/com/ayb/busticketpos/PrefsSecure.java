@@ -13,7 +13,7 @@ import java.security.GeneralSecurityException;
 
 public class PrefsSecure {
 
-    private static SharedPreferences securePrefs;
+    private static volatile SharedPreferences securePrefs;
 
     public static SharedPreferences getSecurePrefs(Context context) {
         if (securePrefs == null) {
@@ -36,17 +36,21 @@ public class PrefsSecure {
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
+        } catch (RuntimeException e) {
+            // Keystore glitch: do not wipe provisioning, just use the plain fallback for this run.
+            AppLog.e("PrefsSecure", "Encrypted prefs runtime failure — using fallback without reset", e);
+            return appCtx.getSharedPreferences("secure_config_prefs_fallback", Context.MODE_PRIVATE);
         } catch (GeneralSecurityException | IOException e) {
             if (!afterReset) {
-                Log.e("PrefsSecure", "Encrypted prefs failed — clearing and retrying once", e);
+                AppLog.e("PrefsSecure", "Encrypted prefs failed — clearing and retrying once", e);
                 try {
                     appCtx.deleteSharedPreferences("secure_config_prefs");
                 } catch (Exception del) {
-                    Log.w("PrefsSecure", "Could not delete secure_config_prefs", del);
+                    AppLog.w("PrefsSecure", "Could not delete secure_config_prefs", del);
                 }
                 return openSecurePrefs(appCtx, true);
             }
-            Log.e("PrefsSecure", "Encrypted prefs unavailable after reset", e);
+            AppLog.e("PrefsSecure", "Encrypted prefs unavailable after reset", e);
             return appCtx.getSharedPreferences("secure_config_prefs_fallback", Context.MODE_PRIVATE);
         }
     }
@@ -66,13 +70,23 @@ public class PrefsSecure {
         getSecurePrefs(context).edit().putString("TENANT_NAME", tenantName).apply();
     }
 
+    /** Reads never throw: a Keystore / decrypt failure returns the default and is logged (nothing is wiped). */
+    private static String safeGet(Context context, String key, String def) {
+        try {
+            return getSecurePrefs(context).getString(key, def);
+        } catch (Throwable t) {
+            AppLog.e("PrefsSecure", "Could not read " + key, t);
+            return def;
+        }
+    }
+
     // 🔓 Retrieve
     public static String getTenantId(Context context) {
-        return getSecurePrefs(context).getString("TENANT_ID", "");
+        return safeGet(context, "TENANT_ID", "");
     }
 
     public static String getMachineId(Context context) {
-        return getSecurePrefs(context).getString("MACHINE_ID", "");
+        return safeGet(context, "MACHINE_ID", "");
     }
 
     public static void saveFeedbackNumber(Context context, String phone_number) {
@@ -81,7 +95,7 @@ public class PrefsSecure {
 
     // 🔓 Retrieve
     public static String getFeedbackNumber(Context context) {
-        return getSecurePrefs(context).getString("PHONE_NUMBER", "");
+        return safeGet(context, "PHONE_NUMBER", "");
     }
 
     public static String getTenantName(Context context) {
@@ -97,9 +111,9 @@ public class PrefsSecure {
 
             return name.trim();
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             // Log it safely if you like (optional)
-            Log.e("PrefsSecure", "Error reading TENANT_NAME", e);
+            AppLog.e("PrefsSecure", "Error reading TENANT_NAME", e);
             return "AYB WAY";
         }
     }
@@ -109,11 +123,12 @@ public class PrefsSecure {
     }
 
     public static String getApiKey(Context context) {
-        return getSecurePrefs(context).getString("API_KEY", "");
+        return safeGet(context, "API_KEY", "");
     }
 
     public static boolean hasProvisioning(Context ctx) {
-        return !getTenantId(ctx).isEmpty() && !getMachineId(ctx).isEmpty() && !getApiKey(ctx).isEmpty();
+        String t = getTenantId(ctx), m = getMachineId(ctx), k = getApiKey(ctx);
+        return t != null && !t.isEmpty() && m != null && !m.isEmpty() && k != null && !k.isEmpty();
     }
 
 

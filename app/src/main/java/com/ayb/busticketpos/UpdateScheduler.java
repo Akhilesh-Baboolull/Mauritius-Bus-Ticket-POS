@@ -47,7 +47,7 @@ public final class UpdateScheduler {
             );
             android.util.Log.i(TAG, "Daily update work enqueued (unique name: app-update, initial delay 1 min)");
         } catch (Exception e) {
-            android.util.Log.e(TAG, "Failed to enqueue daily update work", e);
+            AppLog.e(TAG, "Failed to enqueue daily update work", e);
         }
     }
 
@@ -75,7 +75,7 @@ public final class UpdateScheduler {
             );
             android.util.Log.i(TAG, "Check-only update work enqueued (delayed=" + delayed + ")");
         } catch (Exception e) {
-            android.util.Log.e(TAG, "Failed to enqueue check-only update work", e);
+            AppLog.e(TAG, "Failed to enqueue check-only update work", e);
         }
     }
 
@@ -98,7 +98,7 @@ public final class UpdateScheduler {
             );
             android.util.Log.i(TAG, "Install-now update work enqueued");
         } catch (Exception e) {
-            android.util.Log.e(TAG, "Failed to enqueue install-now work", e);
+            AppLog.e(TAG, "Failed to enqueue install-now work", e);
         }
     }
 }

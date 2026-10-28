@@ -3,12 +3,19 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical" >
+    android:background="@color/ui_surface"
+    android:orientation="vertical">
 
+    <!-- Fares (buttons are added by the fragment) + tariff list -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:layout_marginStart="0dp"
+        android:layout_marginTop="0dp"
+        android:layout_marginEnd="0dp"
+        android:background="@drawable/bg_fare_panel_adult"
+        android:orientation="vertical"
+        android:paddingBottom="12dp">
 
         <LinearLayout
             android:id="@+id/fare_row1"
@@ -16,9 +23,7 @@
             android:layout_height="100dp"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingTop="20dp">
-
-        </LinearLayout>
+            android:paddingTop="12dp" />
 
         <LinearLayout
             android:id="@+id/fare_row2"
@@ -26,9 +31,7 @@
             android:layout_height="100dp"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingTop="10dp">
-
-        </LinearLayout>
+            android:paddingTop="10dp" />
 
         <LinearLayout
             android:id="@+id/fare_row3"
@@ -36,179 +39,137 @@
             android:layout_height="100dp"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingTop="10dp">
+            android:paddingTop="10dp" />
 
-        </LinearLayout>
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_marginTop="10dp"
-        android:gravity="center_horizontal|center_vertical"
-        android:orientation="vertical">
-
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_see_tariffs"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="30dp"
-            android:layout_marginRight="30dp"
+            android:layout_height="64dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="16dp"
             android:backgroundTint="#1bff00"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
             android:text="@string/tariff"
             android:textColor="#000000"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+            android:textSize="@dimen/ui_text_tile"
+            android:textStyle="bold"
+            app:cornerRadius="14dp" />
     </LinearLayout>
 
+    <!-- Boarding stage -->
     <LinearLayout
         android:id="@+id/stage_selector"
         android:layout_width="match_parent"
-        android:layout_height="115dp"
-        android:gravity="center"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/button_left"
-            android:layout_width="74dp"
-            android:layout_height="74dp"
-            android:backgroundTint="#03A9F4"
-            android:paddingLeft="0dp"
-            android:paddingTop="0dp"
-            android:paddingRight="0dp"
-            android:paddingBottom="0dp"
-            android:text="@string/left"
-            android:textSize="34sp"
-            app:cornerRadius="0dp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            style="@style/FlowArrowButton"
+            android:contentDescription="Previous stage"
+            app:icon="@drawable/ic_chevron_left_24" />
 
         <TextView
             android:id="@+id/view_stage"
-            android:layout_width="250dp"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:background="@drawable/textview_border"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:singleLine="true"
-            android:textColor="#000000"
-            android:textSize="38sp"
-            app:layout_constraintEnd_toStartOf="@id/button_right"
-            app:layout_constraintStart_toEndOf="@id/button_left"
-            app:layout_constraintTop_toTopOf="parent" />
+            style="@style/FlowValueBox" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/button_right"
-            android:layout_width="74dp"
-            android:layout_height="74dp"
-            android:backgroundTint="#03A9F4"
-            android:paddingLeft="0dp"
-            android:paddingTop="0dp"
-            android:paddingRight="0dp"
-            android:paddingBottom="0dp"
-            android:text="@string/right"
-            android:textSize="34sp"
-            app:cornerRadius="0dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-
+            style="@style/FlowArrowButton"
+            android:contentDescription="Next stage"
+            app:icon="@drawable/ic_chevron_right_24" />
     </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_print"
+        style="@style/FlowPrimaryButton"
+        android:layout_height="84dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="16dp"
+        android:backgroundTint="#FF0101"
+        android:text="@string/issue_ticket"
+        android:textSize="@dimen/ui_text_tile" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="vertical">
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
-        <Button
-            android:id="@+id/btn_print"
-            android:layout_width="match_parent"
-            android:layout_height="90dp"
-            android:layout_marginLeft="30dp"
-            android:layout_marginRight="30dp"
-            android:layout_marginBottom="20dp"
-            android:backgroundTint="#FF0101"
-            android:text="@string/issue_ticket"
-            android:textSize="34sp"
-            app:cornerRadius="0dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_calculator"
+            style="@style/FlowPrimaryButton"
+            android:layout_width="0dp"
+            android:layout_height="72dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:backgroundTint="#009688"
+            android:contentDescription="Calculator"
+            android:text=""
+            app:icon="@drawable/calculator_icon_foreground"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconSize="108dp" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingLeft="20dp"
-            android:paddingRight="20dp">
-
-            <Button
-                android:id="@+id/btn_calculator"
-                android:layout_width="0dp"
-                android:layout_height="80dp"
-                android:layout_marginRight="10dp"
-                android:layout_weight="1"
-                android:backgroundTint="#009688"
-                android:contentDescription="Calculator"
-                android:text=""
-                android:textSize="38sp"
-                app:cornerRadius="0dp"
-                app:icon="@drawable/calculator_icon_foreground"
-                app:iconGravity="textStart"
-                app:iconPadding="0dp"
-                app:iconSize="120sp" />
-
-            <Button
-                android:id="@+id/btn_menu"
-                android:layout_width="0dp"
-                android:layout_height="80dp"
-                android:layout_marginLeft="10dp"
-                android:layout_weight="1"
-                android:backgroundTint="#2196F3"
-                android:text="@string/str_menu"
-                android:textSize="38sp"
-                app:cornerRadius="0dp"
-                app:iconPadding="0dp" />
-
-        </LinearLayout>
-
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_menu"
+            style="@style/FlowSecondaryButton"
+            android:layout_width="0dp"
+            android:layout_height="72dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="MENU" />
     </LinearLayout>
 
+    <!-- Shift total: hold the eye to reveal -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_marginTop="15dp"
-        android:orientation="horizontal">
+        android:layout_height="60dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/bg_status_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Shift total"
+            android:textColor="@color/ui_text_secondary"
+            android:textSize="@dimen/ui_text_subtitle" />
 
         <TextView
             android:id="@+id/total_amount"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:gravity="center"
             android:text="@string/hidden_amount"
-            android:textAlignment="center"
-            android:textColor="#000000"
-            android:textSize="35sp"
+            android:textColor="@color/ui_text_primary"
+            android:textSize="@dimen/ui_text_tile"
             android:textStyle="bold" />
 
         <ImageButton
             android:id="@+id/btn_view_amount"
-            android:layout_width="100dp"
+            android:layout_width="64dp"
             android:layout_height="match_parent"
-            android:backgroundTint="#00FFFFFF"
+            android:background="@android:color/transparent"
             android:contentDescription="@string/amount_visibility"
-            android:padding="0dp"
-            android:paddingHorizontal="0dp"
-            android:paddingVertical="0dp"
-            android:paddingStart="0dp"
-            android:paddingLeft="0dp"
-            android:paddingTop="0dp"
-            android:paddingEnd="0dp"
-            android:paddingRight="0dp"
-            android:paddingBottom="0dp"
+            android:padding="12dp"
             android:scaleType="fitCenter"
             app:srcCompat="@drawable/baseline_remove_red_eye_24_black" />
-
     </LinearLayout>
 
 </LinearLayout>

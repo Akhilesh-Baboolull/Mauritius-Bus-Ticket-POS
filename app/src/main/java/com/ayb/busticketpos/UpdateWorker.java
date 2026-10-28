@@ -78,7 +78,7 @@ public class UpdateWorker extends Worker {
 
             if (isEmpty(machineIdStr) || isEmpty(tenantIdStr) || isEmpty(apiKey)) {
                 String msg = "MISSING_PROVISIONING";
-                Log.w(TAG, "Missing provisioning (machine/tenant/api_key). Need self-registration.");
+                AppLog.w(TAG, "Missing provisioning (machine/tenant/api_key). Need self-registration.");
                 UpdateCheckLog.log(ctx, "skipped", "missing_provisioning");
                 Prefs.setLastUpdateResult(ctx, "Skipped: device not registered");
                 report(ctx, "CHECK", msg, null, null, null, msg);
@@ -148,7 +148,7 @@ public class UpdateWorker extends Worker {
             try {
                 HttpUtil.downloadToFile(downloadUrl, out);
             } catch (Exception e) {
-                Log.e(TAG, "Download failed", e);
+                AppLog.e(TAG, "Download failed", e);
                 String msg = safeMsg(e);
                 UpdateCheckLog.log(ctx, "error", "download_failed: " + (msg != null ? msg : ""));
                 Prefs.setLastUpdateResult(ctx, "Download failed, will retry");
@@ -161,7 +161,7 @@ public class UpdateWorker extends Worker {
             String actualSha = UpdateAuth.sha256FileHex(out).toLowerCase(Locale.US);
             if (!expectedSha.equals(actualSha)) {
                 String msg = "SHA256_MISMATCH";
-                Log.e(TAG, "SHA256 mismatch expected=" + expectedSha + " actual=" + actualSha);
+                AppLog.e(TAG, "SHA256 mismatch expected=" + expectedSha + " actual=" + actualSha);
                 UpdateCheckLog.log(ctx, "error", "verify_failed");
                 Prefs.setLastUpdateResult(ctx, "Update file failed verification");
                 report(ctx, "VERIFY_FAILED", msg, releaseId, currentVersion, targetVersionCode, msg);
@@ -177,7 +177,7 @@ public class UpdateWorker extends Worker {
                 UpdateInstaller.installApk(ctx, out, releaseId, currentVersion, targetVersionCode);
                 UpdateCheckLog.log(ctx, "updated", currentVersion + " -> " + targetVersionCode);
             } catch (Exception e) {
-                Log.e(TAG, "Install start failed", e);
+                AppLog.e(TAG, "Install start failed", e);
                 String msg = safeMsg(e);
                 UpdateCheckLog.log(ctx, "error", "install_failed: " + (msg != null ? msg : ""));
                 Prefs.setLastUpdateResult(ctx, "Install failed: " + (msg != null ? msg : "unknown"));
@@ -191,7 +191,7 @@ public class UpdateWorker extends Worker {
             return Result.success();
 
         } catch (Exception e) {
-            Log.e(TAG, "Unexpected failure", e);
+            AppLog.e(TAG, "Unexpected failure", e);
             String msg = safeMsg(e);
             UpdateCheckLog.log(ctx, "error", "check_exception: " + (msg != null ? msg : ""));
             Prefs.setLastUpdateResult(ctx, "Check failed: " + (msg != null ? msg : "unknown") + ", will retry");
@@ -280,7 +280,7 @@ public class UpdateWorker extends Worker {
             DatabaseSyncManager.forceSync(ctx, null);
             Log.i(TAG, "DB sync started");
         } catch (Exception e) {
-            Log.e(TAG, "DB sync start failed", e);
+            AppLog.e(TAG, "DB sync start failed", e);
         }
     }
 
@@ -297,7 +297,7 @@ public class UpdateWorker extends Worker {
                 return;
             }
         } catch (Exception e) {
-            Log.w(TAG, "Immediate CHECK report failed, queueing: " + message, e);
+            AppLog.w(TAG, "Immediate CHECK report failed, queueing: " + message, e);
         }
         enqueueReport(ctx, "CHECK", message, releaseId, fromV, toV, message);
         SyncQueueUtil.requestDrain(ctx, true);
@@ -321,7 +321,7 @@ public class UpdateWorker extends Worker {
             SyncQueueUtil.enqueue(ctx, ApiEndpoints.REPORT_URL,
                     buildReportPayload(event, message, releaseId, fromV, toV), lastError);
         } catch (Exception e) {
-            Log.w(TAG, "enqueueReport failed: " + event, e);
+            AppLog.w(TAG, "enqueueReport failed: " + event, e);
         }
     }
 

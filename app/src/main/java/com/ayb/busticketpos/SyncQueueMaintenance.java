@@ -12,11 +12,14 @@ import androidx.work.WorkManager;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 /**
@@ -84,7 +87,7 @@ public final class SyncQueueMaintenance {
                 Log.i(TAG, "Calendar-day queue purge removed=" + removed + " (before " + today + ")");
             }
         } catch (Exception e) {
-            Log.e(TAG, "purgeExpiredJobs failed", e);
+            AppLog.e(TAG, "purgeExpiredJobs failed", e);
         }
         return removed;
     }
@@ -118,7 +121,7 @@ public final class SyncQueueMaintenance {
                 Log.i(TAG, "Pruned sync_queue removed=" + removed + " remaining=" + dao.count());
             }
         } catch (Exception e) {
-            Log.e(TAG, "prune failed", e);
+            AppLog.e(TAG, "prune failed", e);
         }
         return removed;
     }
@@ -132,9 +135,9 @@ public final class SyncQueueMaintenance {
             removed += dao.deleteOverRetries(ApiEndpoints.POSITIONING, 1);
             dao.prunePositioningKeepLatest(ApiEndpoints.POSITIONING, 1);
             trimSyncFailLog(ctx);
-            Log.w(TAG, "Aggressive prune removed=" + removed + " queue=" + dao.count());
+            AppLog.w(TAG, "Aggressive prune removed=" + removed + " queue=" + dao.count());
         } catch (Exception e) {
-            Log.e(TAG, "pruneAggressive failed", e);
+            AppLog.e(TAG, "pruneAggressive failed", e);
         }
     }
 
@@ -161,7 +164,7 @@ public final class SyncQueueMaintenance {
                     SyncQueueUtil.requestDrain(appCtx, fastDrain);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "runAfterEnqueue failed", e);
+                AppLog.e(TAG, "runAfterEnqueue failed", e);
             }
         });
     }
@@ -181,7 +184,7 @@ public final class SyncQueueMaintenance {
                     SyncQueueUtil.requestDrain(app, fastDrain || pending > 50);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "pruneAndScheduleDrainWhenOnline failed", e);
+                AppLog.e(TAG, "pruneAndScheduleDrainWhenOnline failed", e);
             }
         });
     }
@@ -193,10 +196,25 @@ public final class SyncQueueMaintenance {
             try {
                 count = AppDatabase.getInstance(app).syncJobDao().count();
             } catch (Exception e) {
-                Log.e(TAG, "getQueueCount failed", e);
+                AppLog.e(TAG, "getQueueCount failed", e);
             }
             int finalCount = count;
-            MAIN.post(() -> onMainThread.accept(finalCount));
+            MAIN.post(() -> runCallback(() -> onMainThread.accept(finalCount)));
+        });
+    }
+
+    /** Newest queued jobs (up to {@code limit}) for display; empty list on error. */
+    public static void getQueueItemsAsync(Context ctx, int limit, Consumer<List<SyncJob>> onMainThread) {
+        final Context app = ctx.getApplicationContext();
+        EXEC.execute(() -> {
+            List<SyncJob> items = new ArrayList<>();
+            try {
+                items = AppDatabase.getInstance(app).syncJobDao().fetchNewest(limit);
+            } catch (Exception e) {
+                AppLog.e(TAG, "getQueueItems failed", e);
+            }
+            List<SyncJob> finalItems = items;
+            MAIN.post(() -> runCallback(() -> onMainThread.accept(finalItems)));
         });
     }
 
@@ -218,11 +236,20 @@ public final class SyncQueueMaintenance {
                 }
                 Log.i(TAG, "Manual queue clear removed=" + removed);
             } catch (Exception e) {
-                Log.e(TAG, "clearAllQueueManual failed", e);
+                AppLog.e(TAG, "clearAllQueueManual failed", e);
             }
             int finalRemoved = removed;
-            MAIN.post(() -> onMainThread.accept(finalRemoved));
+            MAIN.post(() -> runCallback(() -> onMainThread.accept(finalRemoved)));
         });
+    }
+
+    /** UI callbacks run on the main thread; an exception there would crash the app. */
+    private static void runCallback(Runnable r) {
+        try {
+            r.run();
+        } catch (Throwable t) {
+            AppLog.e(TAG, "Main-thread callback failed", t);
+        }
     }
 
     public static void onStartup(Context ctx) {
@@ -238,7 +265,7 @@ public final class SyncQueueMaintenance {
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "onStartup failed", e);
+                AppLog.e(TAG, "onStartup failed", e);
             }
         });
     }

@@ -13,13 +13,13 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
         try {
-            try { App.scheduleDailyFetch(ctx); } catch (Exception e) { Log.w("BootReceiver", "scheduleDailyFetch failed", e); }
-            try { App.scheduleDailyFetchFallback(ctx); } catch (Exception e) { Log.w("BootReceiver", "scheduleDailyFetchFallback failed", e); }
-            try { LocationForegroundService.startIfNeeded(ctx); } catch (Exception e) { Log.w("BootReceiver", "LocationForegroundService start failed", e); }
-            try { InternetEnforcerReceiver.enforce(ctx); } catch (Exception e) { Log.w("BootReceiver", "InternetEnforcerReceiver failed", e); }
-            try { InternetEnforcerScheduler.schedule(ctx); } catch (Exception e) { Log.w("BootReceiver", "InternetEnforcerScheduler failed", e); }
+            try { App.scheduleDailyFetch(ctx); } catch (Exception e) { AppLog.w("BootReceiver", "scheduleDailyFetch failed", e); }
+            try { App.scheduleDailyFetchFallback(ctx); } catch (Exception e) { AppLog.w("BootReceiver", "scheduleDailyFetchFallback failed", e); }
+            try { LocationForegroundService.startIfNeeded(ctx); } catch (Exception e) { AppLog.w("BootReceiver", "LocationForegroundService start failed", e); }
+            try { InternetEnforcerReceiver.enforce(ctx); } catch (Exception e) { AppLog.w("BootReceiver", "InternetEnforcerReceiver failed", e); }
+            try { InternetEnforcerScheduler.schedule(ctx); } catch (Exception e) { AppLog.w("BootReceiver", "InternetEnforcerScheduler failed", e); }
         } catch (Exception e) {
-            Log.e("BootReceiver", "onReceive failed", e);
+            AppLog.e("BootReceiver", "onReceive failed", e);
             return;
         }
 
@@ -51,7 +51,7 @@ public class BootReceiver extends BroadcastReceiver {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             ctx.startActivity(launchIntent);
         } catch (Exception e) {
-            Log.e("BootReceiver", "Boot launch failed", e);
+            AppLog.e("BootReceiver", "Boot launch failed", e);
         }
     }
 

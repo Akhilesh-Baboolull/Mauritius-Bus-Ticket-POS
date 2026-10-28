@@ -54,6 +54,8 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
 
     @Override
     public void uncaughtException(Thread t, Throwable e) {
+        // Written synchronously: the async file log below may not finish before the process dies.
+        AppLog.crash(t != null ? t.getName() : "unknown", e);
         logException("Uncaught exception in " + t.getName(), e);
         if (defaultHandler != null) {
             defaultHandler.uncaughtException(t, e);

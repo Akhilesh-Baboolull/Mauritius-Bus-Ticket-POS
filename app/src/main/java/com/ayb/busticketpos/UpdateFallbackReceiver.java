@@ -31,16 +31,16 @@ public class UpdateFallbackReceiver extends BroadcastReceiver {
                 try {
                     UpdateScheduler.enqueueDailyUpdate(ctx);
                 } catch (Exception e) {
-                    Log.e("UpdateFallback", "Failed to enqueue daily update", e);
+                    AppLog.e("UpdateFallback", "Failed to enqueue daily update", e);
                 }
             }
             try {
                 App.scheduleDailyFetchFallback(ctx);
             } catch (Exception e) {
-                Log.e("UpdateFallback", "Reschedule fallback alarm failed", e);
+                AppLog.e("UpdateFallback", "Reschedule fallback alarm failed", e);
             }
         } catch (Exception e) {
-            Log.e("UpdateFallback", "onReceive failed", e);
+            AppLog.e("UpdateFallback", "onReceive failed", e);
         }
     }
 }

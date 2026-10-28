@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_card"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <FrameLayout
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/bg_icon_circle_blue">
+
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_device_24"
+            app:tint="#031FB8" />
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:text="Register device"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_text_dialog_title"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:text="Enter the admin password and the IDs issued for this machine."
+        android:textColor="#6B6F76"
+        android:textSize="14sp" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/til_register_password"
+        style="@style/SettingsDialogInput"
+        android:layout_marginTop="20dp"
+        android:hint="Admin password"
+        app:endIconMode="password_toggle"
+        app:startIconDrawable="@drawable/ic_lock_24">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/register_admin_password"
+            style="@style/SettingsDialogInputText"
+            android:imeOptions="actionNext"
+            android:inputType="textPassword" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/til_register_tenant"
+        style="@style/SettingsDialogInput"
+        android:hint="Tenant ID"
+        app:startIconDrawable="@drawable/ic_business_24">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/register_tenant_id"
+            style="@style/SettingsDialogInputText"
+            android:imeOptions="actionNext"
+            android:inputType="number" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/til_register_machine"
+        style="@style/SettingsDialogInput"
+        android:hint="Machine ID"
+        app:startIconDrawable="@drawable/ic_device_24">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/register_machine_id"
+            style="@style/SettingsDialogInputText"
+            android:imeOptions="actionDone"
+            android:inputType="number" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/register_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textColor="#C62828"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_register_cancel"
+            style="@style/SettingsDialogSecondaryButton"
+            android:text="Cancel" />
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="0dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_register_submit"
+            style="@style/SettingsDialogPrimaryButton"
+            android:backgroundTint="#031FB8"
+            android:text="Register" />
+    </LinearLayout>
+</LinearLayout>
