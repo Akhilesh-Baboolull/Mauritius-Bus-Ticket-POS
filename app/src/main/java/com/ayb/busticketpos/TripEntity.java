@@ -3,6 +3,7 @@ package com.ayb.busticketpos;
 import static androidx.room.ForeignKey.CASCADE;
 
 import androidx.annotation.NonNull;
+import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
 import androidx.room.PrimaryKey;
@@ -28,4 +29,8 @@ public class TripEntity {
     public String direction;
     public String start_time;
     public String end_time;
+
+    /** tbl_trips.id once start_trip succeeded; 0 = not on the server yet. */
+    @ColumnInfo(defaultValue = "0")
+    public int serverId;
 }

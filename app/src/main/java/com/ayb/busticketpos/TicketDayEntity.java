@@ -1,6 +1,7 @@
 package com.ayb.busticketpos;
 
 import androidx.annotation.NonNull;
+import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
@@ -22,5 +23,9 @@ public class TicketDayEntity {
     public String start_time;
 
     public String end_time;
+
+    /** tbl_ticket_days.id once create_day succeeded; 0 = not on the server yet. */
+    @ColumnInfo(defaultValue = "0")
+    public int serverId;
 }
 

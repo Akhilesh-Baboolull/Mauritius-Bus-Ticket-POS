@@ -581,22 +581,8 @@ public class Student_Ticket_Fragment extends Fragment {
 
                     AppLog.w("Printer", "Paper-out logged as blank ticket #" + id + " (tripId=" + tripId + ")");
 
-                    // ✅ Push online immediately (optional)
-                    SyncClient.recordBlankTicket(
-                            mContext,
-                            now,
-                            new SyncClient.Callback() {
-                                @Override
-                                public void onSuccess(org.json.JSONObject resp) {
-                                    Log.i("BLANK_SYNC", "Blank ticket uploaded: " + resp);
-                                }
-
-                                @Override
-                                public void onFail(String reason) {
-                                    AppLog.w("BLANK_SYNC", "Blank ticket upload failed: " + reason);
-                                }
-                            }
-                    );
+                    // Queued; sent in order after this trip's Start Trip
+                    SyncClient.recordBlankTicket(mContext, tripId, id, now);
 
                     // ✅ Show toast safely on main thread
                     new Handler(Looper.getMainLooper()).post(() ->
@@ -759,12 +745,14 @@ public class Student_Ticket_Fragment extends Fragment {
             ticket.amount     = ticketAmount;
             ticket.ticketType = "UP TO";
 
-            db.ticketDao().insertTicket(ticket);
+            long localTicketId = db.ticketDao().insertTicket(ticket);
 
             final String apiDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()); // server expects yyyy-MM-dd
 
             SyncClient.recordTicket(
                     mContext,
+                    trip.tripId,
+                    localTicketId,
                     toFourDigitString(finalTicketNo),
                     apiDate,
                     currentTime,
@@ -772,16 +760,7 @@ public class Student_Ticket_Fragment extends Fragment {
                     ticket.ticketType,
                     destination,
                     ticket.fareType,
-                    ticketAmount,
-                    new SyncClient.Callback() {
-                        @Override public void onSuccess(org.json.JSONObject resp) {
-                            Log.d("TICKET_SYNC", "Ticket sent: " + resp);
-                        }
-                        @Override public void onFail(String reason) {
-                            AppLog.e("TICKET_SYNC", "Ticket send failed: " + reason);
-
-                        }
-                    }
+                    ticketAmount
             );
 
         });
@@ -835,22 +814,8 @@ public class Student_Ticket_Fragment extends Fragment {
 
                     AppLog.w("Printer", "Paper-out logged as blank ticket #" + id + " (tripId=" + tripId + ")");
 
-                    // ✅ Push online immediately (optional)
-                    SyncClient.recordBlankTicket(
-                            mContext,
-                            now,
-                            new SyncClient.Callback() {
-                                @Override
-                                public void onSuccess(org.json.JSONObject resp) {
-                                    Log.i("BLANK_SYNC", "Blank ticket uploaded: " + resp);
-                                }
-
-                                @Override
-                                public void onFail(String reason) {
-                                    AppLog.w("BLANK_SYNC", "Blank ticket upload failed: " + reason);
-                                }
-                            }
-                    );
+                    // Queued; sent in order after this trip's Start Trip
+                    SyncClient.recordBlankTicket(mContext, tripId, id, now);
 
                     // ✅ Show toast safely on main thread
                     new Handler(Looper.getMainLooper()).post(() ->
@@ -996,12 +961,14 @@ public class Student_Ticket_Fragment extends Fragment {
             ticket.amount     = Integer.parseInt(tariff);
             ticket.ticketType = "TO";
 
-            db.ticketDao().insertTicket(ticket);
+            long localTicketId = db.ticketDao().insertTicket(ticket);
 
             final String apiDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()); // server expects yyyy-MM-dd
 
             SyncClient.recordTicket(
                     mContext,
+                    trip.tripId,
+                    localTicketId,
                     toFourDigitString(finalTicketNo),
                     apiDate,
                     currentTime,
@@ -1009,16 +976,7 @@ public class Student_Ticket_Fragment extends Fragment {
                     ticket.ticketType,
                     destination,
                     ticket.fareType,
-                    Integer.parseInt(tariff),
-                    new SyncClient.Callback() {
-                        @Override public void onSuccess(org.json.JSONObject resp) {
-                            Log.d("TICKET_SYNC", "Ticket sent: " + resp);
-                        }
-                        @Override public void onFail(String reason) {
-                            AppLog.e("TICKET_SYNC", "Ticket send failed: " + reason);
-
-                        }
-                    }
+                    Integer.parseInt(tariff)
             );
 
         });

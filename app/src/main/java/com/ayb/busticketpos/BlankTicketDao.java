@@ -17,6 +17,16 @@ public interface BlankTicketDao {
     @Insert
     long insert(BlankTicketEntity blankTicket);
 
+    @Query("SELECT * FROM blank_tickets WHERE id = :id LIMIT 1")
+    BlankTicketEntity getById(long id);
+
+    @Query("UPDATE blank_tickets SET uploaded = 1 WHERE id = :id")
+    void markUploaded(long id);
+
+    /** Legacy queue mapping: latest local blank ticket logged at this time. */
+    @Query("SELECT * FROM blank_tickets WHERE datetime = :datetime ORDER BY id DESC LIMIT 1")
+    BlankTicketEntity findLatestByDatetime(String datetime);
+
     /** Get all blank tickets (latest first) */
     @Query("SELECT * FROM blank_tickets ORDER BY id DESC")
     List<BlankTicketEntity> getAll();

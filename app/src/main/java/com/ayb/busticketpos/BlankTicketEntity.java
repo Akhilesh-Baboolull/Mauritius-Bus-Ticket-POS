@@ -1,5 +1,6 @@
 package com.ayb.busticketpos;
 
+import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 import androidx.annotation.NonNull;
@@ -21,6 +22,10 @@ public class BlankTicketEntity {
 
     /** Optional trip ID reference (null = not assigned yet) */
     public int tripId;
+
+    /** 1 once blank_ticket succeeded. */
+    @ColumnInfo(defaultValue = "0")
+    public int uploaded;
 
     // --- Convenience constructor ---
     public BlankTicketEntity(@NonNull String datetime, int tripId) {

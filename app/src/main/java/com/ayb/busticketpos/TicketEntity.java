@@ -1,6 +1,7 @@
 package com.ayb.busticketpos;
 
 import androidx.annotation.NonNull;
+import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
 import androidx.room.PrimaryKey;
@@ -30,4 +31,8 @@ public class TicketEntity {
     public String endStage;
     public String fareType;   // "Adult", "Student", "Child"
     public int amount;
+
+    /** 1 once record_ticket succeeded. */
+    @ColumnInfo(defaultValue = "0")
+    public int uploaded;
 }

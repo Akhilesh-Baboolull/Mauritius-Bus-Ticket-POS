@@ -10,10 +10,46 @@ import java.util.List;
 public interface TicketDao {
 
     @Insert
-    void insertTrip(TripEntity trip);
+    long insertTrip(TripEntity trip);
 
     @Insert
-    void insertTicket(TicketEntity ticket);
+    long insertTicket(TicketEntity ticket);
+
+    // ---- Server sync (SyncDispatcher) ----
+
+    @Query("SELECT * FROM ticket_days WHERE id = :id LIMIT 1")
+    TicketDayEntity getDayById(long id);
+
+    @Query("SELECT * FROM trips WHERE tripId = :id LIMIT 1")
+    TripEntity getTripById(long id);
+
+    @Query("SELECT * FROM tickets WHERE ticketId = :id LIMIT 1")
+    TicketEntity getTicketById(long id);
+
+    @Query("UPDATE ticket_days SET serverId = :serverId WHERE id = :id")
+    void setDayServerId(long id, int serverId);
+
+    @Query("UPDATE trips SET serverId = :serverId WHERE tripId = :id")
+    void setTripServerId(long id, int serverId);
+
+    @Query("UPDATE tickets SET uploaded = 1 WHERE ticketId = :id")
+    void markTicketUploaded(long id);
+
+    /** Legacy queue mapping: latest local day for a date (dd/MM/yy) + bus. */
+    @Query("SELECT * FROM ticket_days WHERE date = :date AND busNo = :busNo ORDER BY id DESC LIMIT 1")
+    TicketDayEntity findLatestDay(String date, String busNo);
+
+    /** Legacy queue mapping: latest local trip with this number / route / direction. */
+    @Query("SELECT * FROM trips WHERE tripNo = :tripNo AND route = :route AND direction = :direction ORDER BY tripId DESC LIMIT 1")
+    TripEntity findLatestTrip(int tripNo, String route, String direction);
+
+    /** Legacy queue mapping: latest local trip with this number. */
+    @Query("SELECT * FROM trips WHERE tripNo = :tripNo ORDER BY tripId DESC LIMIT 1")
+    TripEntity findLatestTripByNo(int tripNo);
+
+    /** Legacy queue mapping: latest local ticket with this number / time / amount. */
+    @Query("SELECT * FROM tickets WHERE ticketNo = :ticketNo AND time = :time AND amount = :amount ORDER BY ticketId DESC LIMIT 1")
+    TicketEntity findLatestTicket(String ticketNo, String time, int amount);
 
     @Query("SELECT * FROM tickets WHERE tripId = :tripId")
     List<TicketEntity> getTicketsForTrip(int tripId);

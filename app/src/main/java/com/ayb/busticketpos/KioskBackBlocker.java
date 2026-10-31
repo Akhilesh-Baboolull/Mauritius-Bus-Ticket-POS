@@ -21,7 +21,8 @@ final class KioskBackBlocker implements Application.ActivityLifecycleCallbacks {
     public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
         if (!(activity instanceof ComponentActivity)) return;
         try {
-            ((ComponentActivity) activity).getOnBackPressedDispatcher().addCallback(activity,
+            ComponentActivity componentActivity = (ComponentActivity) activity;
+            componentActivity.getOnBackPressedDispatcher().addCallback(componentActivity,
                     new OnBackPressedCallback(true) {
                         @Override
                         public void handleOnBackPressed() {

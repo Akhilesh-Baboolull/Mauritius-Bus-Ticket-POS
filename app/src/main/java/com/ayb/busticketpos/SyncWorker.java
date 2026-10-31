@@ -5,11 +5,6 @@ import android.content.Context;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.work.Constraints;
-import androidx.work.ExistingWorkPolicy;
-import androidx.work.NetworkType;
-import androidx.work.OneTimeWorkRequest;
-import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
@@ -19,10 +14,18 @@ import org.json.JSONObject;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
+/**
+ * Drains sync_queue.
+ *  1) Business uploads (day / trip / ticket ...) via {@link SyncDispatcher}: strict order, never dropped.
+ *  2) Everything else (update reports, positioning, audit events): best effort, as before.
+ * The next run is scheduled here (APPEND_OR_REPLACE) instead of Result.retry(), so WorkManager's
+ * exponential backoff cannot push the next attempt hours away.
+ */
 public class SyncWorker extends Worker {
     private static final String TAG = "SyncWorker";
+    private static final int MAX_BUSINESS_JOBS_PER_RUN = 150;
+    private static final int OTHER_BATCH = 50;
 
     public SyncWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -31,39 +34,54 @@ public class SyncWorker extends Worker {
     @NonNull @Override
     public Result doWork() {
         Context ctx = getApplicationContext();
-        SyncQueueMaintenance.prune(ctx);
+        long nextRunMs = -1L;
+        try {
+            SyncQueueMaintenance.prune(ctx);
 
+            SyncDispatcher.Outcome biz = SyncDispatcher.drain(ctx, MAX_BUSINESS_JOBS_PER_RUN, this::isStopped);
+            if (biz.state != SyncDispatcher.State.EMPTY) {
+                nextRunMs = biz.retryInMs;
+            }
+
+            if (drainOthers(ctx)) {
+                nextRunMs = nextRunMs < 0 ? 10_000L : Math.min(nextRunMs, 10_000L);
+            }
+
+            // A job queued while this run was finishing: its own drain request was ignored (KEEP).
+            if (nextRunMs < 0 && AppDatabase.getInstance(ctx).syncJobDao()
+                    .countIn(SyncDispatcher.BUSINESS_ENDPOINTS) > 0) {
+                nextRunMs = 2_000L;
+            }
+        } catch (Throwable t) {
+            AppLog.e(TAG, "Sync run failed", t);
+            nextRunMs = 30_000L;
+        }
+
+        if (nextRunMs >= 0) {
+            SyncQueueUtil.scheduleFollowUp(ctx, nextRunMs);
+            Log.d(TAG, "Next sync run in " + (nextRunMs / 1000) + "s");
+        }
+        return Result.success();
+    }
+
+    /** Non-business jobs. @return true if some are still waiting. */
+    private boolean drainOthers(Context ctx) {
         AppDatabase db = AppDatabase.getInstance(ctx);
         SyncJobDao dao = db.syncJobDao();
 
-        int pending = dao.count();
-        if (pending == 0) return Result.success();
-
-        int batchSize = pending > 80 ? 80 : Math.min(50, pending);
-        List<SyncJob> batch = dao.fetchBatchPrioritized(
-                ApiEndpoints.REPORT_URL,
-                ApiEndpoints.CREATE_DAY,
-                ApiEndpoints.START_TRIP,
-                ApiEndpoints.RECORD_TICKET,
-                ApiEndpoints.END_TRIP,
-                ApiEndpoints.END_DAY,
-                ApiEndpoints.BLANK_TICKET,
-                batchSize
-        );
-        if (batch.isEmpty()) return Result.success();
-
-        Log.i(TAG, "Draining batch=" + batch.size() + " pending=" + pending);
-
-        boolean anyFailed = false;
+        List<SyncJob> batch = dao.fetchBatchExcluding(
+                SyncDispatcher.BUSINESS_ENDPOINTS, ApiEndpoints.REPORT_URL, OTHER_BATCH);
+        if (batch.isEmpty()) return false;
 
         for (SyncJob job : batch) {
+            if (isStopped()) break;
             if (ApiEndpoints.POSITIONING.equals(job.endpoint)
                     && job.retryCount >= SyncQueueMaintenance.MAX_POSITIONING_RETRIES) {
                 dao.deleteById(job.id);
                 continue;
             }
             if (!ApiEndpoints.POSITIONING.equals(job.endpoint)
-                    && job.retryCount >= SyncQueueMaintenance.MAX_BUSINESS_RETRIES) {
+                    && job.retryCount >= SyncQueueMaintenance.MAX_OTHER_RETRIES) {
                 AppLog.w(TAG, "Giving up after max retries id=" + job.id + " " + job.endpoint);
                 dao.deleteById(job.id);
                 continue;
@@ -76,7 +94,6 @@ public class SyncWorker extends Worker {
                     String apiKey = PrefsSecure.getApiKey(ctx);
                     if (machineIdStr == null || machineIdStr.trim().isEmpty()
                             || apiKey == null || apiKey.trim().isEmpty()) {
-                        anyFailed = true;
                         dao.markFailed(job.id, "Missing provisioning for report");
                         continue;
                     }
@@ -93,7 +110,6 @@ public class SyncWorker extends Worker {
                     resp = HttpUtil.parseJsonObjectLenient(respStr);
                 } catch (JSONException je) {
                     AppLog.e(TAG, job.endpoint + " parse failed: " + je.getMessage());
-                    anyFailed = true;
                     dao.markFailed(job.id, je.getMessage());
                     continue;
                 }
@@ -101,46 +117,16 @@ public class SyncWorker extends Worker {
                         || resp.optBoolean("ok", false);
 
                 if (success) {
-                    if (ApiEndpoints.CREATE_DAY.equals(job.endpoint)) {
-                        int serverDayId = resp.optInt("id", 0);
-                        if (serverDayId > 0) {
-                            Prefs.saveCurrentServerDayID(ctx, serverDayId);
-                        }
-                    } else if (ApiEndpoints.START_TRIP.equals(job.endpoint)) {
-                        int tripId = resp.optInt("trip_id", 0);
-                        if (tripId > 0) {
-                            Prefs.saveCurrentServerTripID(ctx, tripId);
-                        }
-                    }
                     dao.deleteById(job.id);
                     Prefs.setLastUploadSuccessAt(ctx, System.currentTimeMillis());
                 } else {
-                    anyFailed = true;
                     dao.markFailed(job.id, resp.optString("message", "server fail"));
                 }
             } catch (Exception e) {
-                anyFailed = true;
                 dao.markFailed(job.id, e.getMessage());
             }
         }
 
-        int remaining = dao.count();
-        if (remaining > 0) {
-            int delaySec = remaining > 100 ? 2 : (remaining > 30 ? 5 : 10);
-            OneTimeWorkRequest req = new OneTimeWorkRequest.Builder(SyncWorker.class)
-                    .setInitialDelay(delaySec, TimeUnit.SECONDS)
-                    .setConstraints(new Constraints.Builder()
-                            .setRequiredNetworkType(NetworkType.CONNECTED)
-                            .build())
-                    .build();
-            WorkManager.getInstance(ctx).enqueueUniqueWork(
-                    "sync-drain",
-                    ExistingWorkPolicy.KEEP,
-                    req
-            );
-            Log.d(TAG, "Scheduled next drain in " + delaySec + "s remaining=" + remaining);
-        }
-
-        return anyFailed ? Result.retry() : Result.success();
+        return dao.count() - dao.countIn(SyncDispatcher.BUSINESS_ENDPOINTS) > 0;
     }
 }

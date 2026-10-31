@@ -113,11 +113,10 @@ public class Trip extends AppCompatActivity {
                     TripEntity currentTrip = db.ticketDao().getLastTrip();
                     if (currentTrip != null) {
                         db.ticketDao().endTrip(currentTime, currentTrip.tripId);
+                        // Queued after the local update; sent after this trip's start and tickets.
+                        SyncClient.endTrip(getApplicationContext(), currentTrip.tripId, currentTrip.tripNo, currentTime);
                     }
 
-                    final int tripId = Prefs.getCurrentServerTripID(this);
-                    final int dayId  = Prefs.getCurrentServerDayID(this);
-                    final int tripNo = Prefs.getTripCount(this);
                     final String busNo = Prefs.getSelectedBus(this);
 
                     Prefs.clearTrip(this);
@@ -130,24 +129,6 @@ public class Trip extends AppCompatActivity {
                                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
                         finish();
                     });
-
-                    SyncClient.endTrip(
-                            getApplicationContext(),
-                            tripId,
-                            dayId,
-                            tripNo,
-                            new SyncClient.Callback() {
-                                @Override
-                                public void onSuccess(org.json.JSONObject resp) {
-                                    Log.d("Trip", "Trip sync success: " + resp);
-                                }
-
-                                @Override
-                                public void onFail(String reason) {
-                                    AppLog.e("Trip", "Trip sync failed: " + reason);
-                                }
-                            }
-                    );
 
                 } catch (Exception e) {
                     AppLog.e("Trip", "Error ending trip", e);
@@ -316,9 +297,10 @@ public class Trip extends AppCompatActivity {
                         trip.route = chosenRoute.routeName;
                         trip.direction = selectedDirection;
                         trip.start_time = currentTime;
-                        db.ticketDao().insertTrip(trip);
+                        long localTripId = db.ticketDao().insertTrip(trip);
+                        // Queued right after the local insert; sent after the day's Start Day.
+                        SyncClient.startTrip(getApplicationContext(), localTripId);
 
-                        final int serverDayId = Prefs.getCurrentServerDayID(Trip.this);
                         final String routeName = chosenRoute.routeName;
                         final String direction = selectedDirection;
 
@@ -331,15 +313,6 @@ public class Trip extends AppCompatActivity {
                                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
                             finish();
                         });
-
-                        SyncClient.startTrip(
-                                getApplicationContext(),
-                                serverDayId,
-                                count,
-                                routeName,
-                                direction,
-                                null
-                        );
                     });
                 });
 

@@ -530,7 +530,7 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
         }
         showStatus(tvUploadProgress, "Sending pending data…");
         final Context app = getApplicationContext();
-        AppExecutors.runBg(() -> SyncQueueUtil.requestDrain(app, true));
+        AppExecutors.runBg(() -> SyncQueueUtil.requestDrainNow(app));
         SettingsAudit.log(this, SettingsAudit.Event.PENDING_UPLOAD_REQUESTED);
     }
 
@@ -633,8 +633,26 @@ public class DeviceMaintenanceActivity extends AppCompatActivity {
                 .title("Clear sync queue?")
                 .message("This removes all pending offline uploads on this device. They will not be sent to the server.")
                 .negative("Cancel", null)
-                .positive("Clear", this::clearQueue)
+                .positive("Clear", () -> SyncQueueMaintenance.getBusinessCountAsync(this, business -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (business > 0) confirmClearBusiness(business);
+                    else clearQueue();
+                }))
                 .positiveColor(android.graphics.Color.parseColor("#D32F2F"))
+                .show();
+    }
+
+    /** Second confirmation: day / trip / ticket uploads are never removed automatically. */
+    private void confirmClearBusiness(int business) {
+        AppDialog.with(this)
+                .type(AppDialog.Type.ERROR)
+                .title("Delete unsent tickets?")
+                .message(business + " day, trip or ticket upload(s) have not reached the server yet. "
+                        + "If you clear them, they will never be sent and the server will be missing this data.")
+                .negative("Keep them", null)
+                .positive("Delete " + business, this::clearQueue)
+                .positiveColor(android.graphics.Color.parseColor("#D32F2F"))
+                .cancelable(false)
                 .show();
     }
 

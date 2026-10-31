@@ -117,7 +117,6 @@ public class Day extends AppCompatActivity {
                 AppDatabase db = AppDatabase.getInstance(this);
                 String today = Prefs.getDayDate(this);
 
-                int serverDayId = Prefs.getCurrentServerDayID(this);
                 String todayPrefs = Prefs.getDayDate(this);
                 String bus = Prefs.getSelectedBus(this);
 
@@ -184,7 +183,7 @@ public class Day extends AppCompatActivity {
 
                 SyncClient.endDay(
                         getApplicationContext(),
-                        serverDayId,
+                        day.id,
                         todayPrefs,
                         bus,
                         total,
@@ -193,8 +192,7 @@ public class Day extends AppCompatActivity {
                         wage,
                         meal,
                         maint,
-                        otherExp,
-                        null
+                        otherExp
                 );
             });
         });
@@ -205,7 +203,6 @@ public class Day extends AppCompatActivity {
                 AppDatabase db = AppDatabase.getInstance(this);
                 String today = Prefs.getDayDate(this);
 
-                int serverDayId = Prefs.getCurrentServerDayID(this);
                 String todayPrefs = Prefs.getDayDate(this);
                 String bus = Prefs.getSelectedBus(this);
 
@@ -264,12 +261,11 @@ public class Day extends AppCompatActivity {
 
                 SyncClient.endDay(
                         getApplicationContext(),
-                        serverDayId,
+                        day.id,
                         todayPrefs,
                         bus,
                         total,
-                        0, 0, 0, 0, 0, 0,
-                        null
+                        0, 0, 0, 0, 0, 0
                 );
             });
 
@@ -422,6 +418,8 @@ public class Day extends AppCompatActivity {
                             dayEntity.busNo = selectedBus;
                             dayEntity.start_time = startTime;
                             long thisdayId = db.ticketDao().insertDay(dayEntity);
+                            // Queued right after the local insert; sent in order when online.
+                            SyncClient.createDay(app, thisdayId);
 
                             ReportsEntity re = new ReportsEntity();
                             re.dayId = (int) thisdayId;
@@ -436,18 +434,6 @@ public class Day extends AppCompatActivity {
                         } catch (Exception e) {
                             AppLog.e("Day", "Local day insert failed", e);
                         }
-
-                        SyncClient.createDay(app, todayPrefs, selectedBus, new SyncClient.Callback() {
-                            @Override public void onSuccess(JSONObject resp) { /* server id saved in SyncClient */ }
-
-                            @Override public void onFail(String reason) {
-                                if (reason == null || reason.isEmpty()) return;
-                                new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
-                                        Toast.makeText(app,
-                                                "Day started locally. Server sync will retry.",
-                                                Toast.LENGTH_LONG).show());
-                            }
-                        });
                     });
                 });
             });

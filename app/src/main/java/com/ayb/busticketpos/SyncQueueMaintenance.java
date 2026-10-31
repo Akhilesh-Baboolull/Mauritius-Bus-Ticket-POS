@@ -42,9 +42,9 @@ public final class SyncQueueMaintenance {
     public static final int MAX_POSITIONING_KEEP = 2;
     /** Drop stale positioning after this many failed drain attempts. */
     public static final int MAX_POSITIONING_RETRIES = 4;
-    /** Business payloads (tickets, day, trip) — keep retrying longer. */
-    public static final int MAX_BUSINESS_RETRIES = 80;
-    /** Failed pushes older than this are dropped (rolling window). */
+    /** Audit events / update reports: give up after this many failed attempts. Business jobs never give up. */
+    public static final int MAX_OTHER_RETRIES = 80;
+    /** Failed pushes older than this are dropped (rolling window). Not applied to business jobs. */
     public static final long MAX_QUEUE_AGE_MS = 24L * 60 * 60 * 1000;
 
     private static final long LOG_FILE_TRIM_BYTES = 256 * 1024;
@@ -66,14 +66,17 @@ public final class SyncQueueMaintenance {
         }
     }
 
-    /** Drop jobs older than 24h; on first run each calendar day, drop everything before midnight. */
+    /**
+     * Drop non-business jobs older than 24h; on first run each calendar day, drop non-business jobs
+     * from before midnight. Day / trip / ticket / waybill / blank-ticket uploads are never dropped here.
+     */
     public static int purgeExpiredJobs(Context ctx) {
         int removed = 0;
         try {
             AppDatabase db = AppDatabase.getInstance(ctx);
             SyncJobDao dao = db.syncJobDao();
             long now = System.currentTimeMillis();
-            removed += dao.deleteOlderThan(now - MAX_QUEUE_AGE_MS);
+            removed += dao.deleteOlderThanExcluding(now - MAX_QUEUE_AGE_MS, SyncDispatcher.BUSINESS_ENDPOINTS);
 
             String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
             if (!today.equals(Prefs.getSyncQueueDayPurgeKey(ctx))) {
@@ -82,7 +85,7 @@ public final class SyncQueueMaintenance {
                 cal.set(Calendar.MINUTE, 0);
                 cal.set(Calendar.SECOND, 0);
                 cal.set(Calendar.MILLISECOND, 0);
-                removed += dao.deleteOlderThan(cal.getTimeInMillis());
+                removed += dao.deleteOlderThanExcluding(cal.getTimeInMillis(), SyncDispatcher.BUSINESS_ENDPOINTS);
                 Prefs.setSyncQueueDayPurgeKey(ctx, today);
                 Log.i(TAG, "Calendar-day queue purge removed=" + removed + " (before " + today + ")");
             }
@@ -112,7 +115,7 @@ public final class SyncQueueMaintenance {
             }
             if (total > MAX_QUEUE_ROWS) {
                 int excess = total - MAX_QUEUE_ROWS;
-                removed += dao.deleteOldestAny(excess);
+                removed += dao.deleteOldestExcluding(excess, SyncDispatcher.BUSINESS_ENDPOINTS);
             }
 
             trimSyncFailLog(ctx);
@@ -218,6 +221,21 @@ public final class SyncQueueMaintenance {
         });
     }
 
+    /** Pending day / trip / ticket / waybill / blank-ticket uploads. */
+    public static void getBusinessCountAsync(Context ctx, IntConsumer onMainThread) {
+        final Context app = ctx.getApplicationContext();
+        EXEC.execute(() -> {
+            int count = 0;
+            try {
+                count = AppDatabase.getInstance(app).syncJobDao().countIn(SyncDispatcher.BUSINESS_ENDPOINTS);
+            } catch (Exception e) {
+                AppLog.e(TAG, "getBusinessCount failed", e);
+            }
+            int finalCount = count;
+            MAIN.post(() -> runCallback(() -> onMainThread.accept(finalCount)));
+        });
+    }
+
     /** Technician manual clear — wipes entire sync_queue and fail log. */
     public static void clearAllQueueManual(Context ctx, IntConsumer onMainThread) {
         final Context app = ctx.getApplicationContext();
@@ -225,6 +243,7 @@ public final class SyncQueueMaintenance {
             int removed = 0;
             try {
                 removed = AppDatabase.getInstance(app).syncJobDao().deleteAll();
+                SyncDispatcher.resetBackoff(app);
                 File log = new File(app.getFilesDir(), "sync_fail_log.csv");
                 if (log.exists()) {
                     //noinspection ResultOfMethodCallIgnored

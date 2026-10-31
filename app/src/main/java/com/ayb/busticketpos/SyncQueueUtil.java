@@ -85,4 +85,36 @@ public final class SyncQueueUtil {
             AppLog.e(TAG, "requestDrain failed", e);
         }
     }
+
+    /** Called by SyncWorker at the end of a run: queue the next run after this one finishes. */
+    static void scheduleFollowUp(Context ctx, long delayMs) {
+        try {
+            OneTimeWorkRequest req = new OneTimeWorkRequest.Builder(SyncWorker.class)
+                    .setInitialDelay(Math.max(0L, delayMs), TimeUnit.MILLISECONDS)
+                    .setConstraints(new Constraints.Builder()
+                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                            .build())
+                    .build();
+            WorkManager.getInstance(ctx.getApplicationContext()).enqueueUniqueWork(
+                    UNIQUE_DRAIN, ExistingWorkPolicy.APPEND_OR_REPLACE, req);
+        } catch (Exception e) {
+            AppLog.e(TAG, "scheduleFollowUp failed", e);
+        }
+    }
+
+    /** Settings "Send pending data now": skip any waiting delay and send immediately. */
+    public static void requestDrainNow(Context ctx) {
+        try {
+            Context app = ctx.getApplicationContext();
+            SyncDispatcher.resetBackoff(app);
+            OneTimeWorkRequest req = new OneTimeWorkRequest.Builder(SyncWorker.class)
+                    .setConstraints(new Constraints.Builder()
+                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                            .build())
+                    .build();
+            WorkManager.getInstance(app).enqueueUniqueWork(UNIQUE_DRAIN, ExistingWorkPolicy.REPLACE, req);
+        } catch (Exception e) {
+            AppLog.e(TAG, "requestDrainNow failed", e);
+        }
+    }
 }

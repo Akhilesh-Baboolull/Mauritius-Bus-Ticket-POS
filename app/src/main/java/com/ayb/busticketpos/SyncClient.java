@@ -2,37 +2,22 @@
 package com.ayb.busticketpos;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Entry point for server uploads.
+ *
+ * Day / trip / ticket / blank ticket / end trip / end day are saved to the sync queue only
+ * (with LOCAL Room ids) and sent in order by {@link SyncDispatcher}, usually within a few seconds
+ * when online. Call these after the local Room insert/update, from the same background thread,
+ * so queue order matches the order things happened.
+ */
 public final class SyncClient {
     private static final String TAG = "SyncClient";
-
-    /**
-     * One shared worker for all sync API calls. Do not use a throwaway
-     * {@code Executors.newSingleThreadExecutor()} per call — on Android the executor can be
-     * finalized before the runnable runs, so create_day (etc.) never hit the network while the
-     * UI still showed "day started".
-     */
-    private static final ExecutorService EXEC = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "SyncClient");
-        t.setPriority(Thread.NORM_PRIORITY);
-        return t;
-    });
-
-    /** Own queue so start-day is never blocked behind ticket/end-day HTTP. */
-    private static final ExecutorService EXEC_DAY = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "SyncClient-createDay");
-        t.setPriority(Thread.NORM_PRIORITY);
-        return t;
-    });
 
     /** Audit events have their own queue so they never delay ticket / day / trip uploads. */
     private static final ExecutorService EXEC_AUDIT = Executors.newSingleThreadExecutor(r -> {
@@ -48,29 +33,6 @@ public final class SyncClient {
         void onFail(String reason);
     }
 
-    /** Callbacks run on the sync thread; an exception there would kill the app (or re-queue a sent item). */
-    private static void deliverSuccess(Callback cb, JSONObject resp) {
-        if (cb == null) return;
-        try {
-            cb.onSuccess(resp);
-        } catch (Throwable t) {
-            AppLog.e(TAG, "Sync success callback failed", t);
-        }
-    }
-
-    private static void deliverFail(Callback cb, String reason) {
-        if (cb == null) return;
-        try {
-            cb.onFail(reason);
-        } catch (Throwable t) {
-            AppLog.e(TAG, "Sync failure callback failed", t);
-        }
-    }
-
-    private static int safeInt(String s) throws NumberFormatException {
-        return Integer.parseInt(s);
-    }
-
     private static int intOrZero(String s) {
         try {
             return s == null ? 0 : Integer.parseInt(s.trim());
@@ -79,87 +41,26 @@ public final class SyncClient {
         }
     }
 
-    /** createDay callbacks must run on main thread (navigation / Toast in Day). */
-    private static void deliverCreateDayOnMain(Callback cb, boolean success, JSONObject resp, String failReason) {
-        if (cb == null) return;
-        new Handler(Looper.getMainLooper()).post(() -> {
-            try {
-                if (success && resp != null) {
-                    cb.onSuccess(resp);
-                } else {
-                    cb.onFail(failReason != null ? failReason : "unknown");
-                }
-            } catch (Exception e) {
-                AppLog.e(TAG, "createDay callback crashed", e);
-            }
-        });
+    private static void queue(Context ctx, String endpoint, JSONObject payload) {
+        try {
+            SyncQueueUtil.enqueue(ctx.getApplicationContext(), endpoint, payload, null);
+        } catch (Exception e) {
+            AppLog.e(TAG, "Could not queue " + endpoint, e);
+        }
     }
 
-    /** Create Day */
-    public static void createDay(Context ctx, String prefsDate_ddMMyy, String busNo, Callback cb) {
-        Log.d(TAG, "createDay scheduled (dedicated createDay thread)");
-        EXEC_DAY.execute(() -> {
-            Log.d(TAG, "createDay runnable executing");
-            final Context appCtx = ctx.getApplicationContext();
-            try {
-                String tenantStr = PrefsSecure.getTenantId(appCtx);
-                String machineStr = PrefsSecure.getMachineId(appCtx);
-                if (tenantStr == null || tenantStr.trim().isEmpty()
-                        || machineStr == null || machineStr.trim().isEmpty()) {
-                    AppLog.e(TAG, "createDay: missing tenant_id or machine_id — register device first");
-                    deliverCreateDayOnMain(cb, false, null, "Missing tenant or machine ID (register device)");
-                    return;
-                }
-                int userId    = safeInt(tenantStr.trim());
-                int machineId = safeInt(machineStr.trim());
-
-                String date       = DateFmt.prefsToServerDate(prefsDate_ddMMyy); // yyyy-MM-dd
-                String start_time = DateFmt.nowServerDateTime();                  // yyyy-MM-dd HH:mm:ss
-
-                JSONObject payload = new JSONObject()
-                        .put("user_id", userId)
-                        .put("machine_id", machineId)
-                        .put("date", date)
-                        .put("bus_no", busNo)
-                        .put("start_time", start_time);
-
-                Log.i(TAG, "createDay POST " + ApiEndpoints.CREATE_DAY + " bus=" + busNo + " date=" + date);
-
-                try {
-                    String respStr = HttpUtil.postJson(ApiEndpoints.CREATE_DAY, payload.toString());
-                    Log.d(TAG, "createDay HTTP returned, parsing JSON…");
-                    JSONObject resp = HttpUtil.parseJsonObjectLenient(respStr);
-                    if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        int serverDayId = resp.optInt("id", 0);
-                        if (serverDayId > 0) {
-                            Prefs.saveCurrentServerDayID(appCtx, serverDayId);
-                        }
-                        Log.i(TAG, "createDay success serverDayId=" + serverDayId);
-                        deliverCreateDayOnMain(cb, true, resp, null);
-                    } else {
-                        // server responded fail → enqueue
-                        String msg = resp.optString("message", "server fail");
-                        AppLog.w(TAG, "createDay server fail: " + msg);
-                        LogSink.logTerminalFailure(appCtx, ApiEndpoints.CREATE_DAY, payload.toString(), msg);
-                        deliverCreateDayOnMain(cb, false, null, msg);
-                    }
-                } catch (Exception netOrParse) {
-                    // IOException (network) or JSONException (bad body) → enqueue for retry
-                    AppLog.w(TAG, "createDay network/parse error, queueing: " + netOrParse.getMessage());
-                    SyncQueueUtil.enqueue(appCtx, ApiEndpoints.CREATE_DAY, payload, netOrParse.getMessage());
-                    deliverCreateDayOnMain(cb, false, null, netOrParse.getMessage());
-                }
-
-            } catch (Exception e) {
-                AppLog.e(TAG, "createDay failed", e);
-                deliverCreateDayOnMain(cb, false, null, e.getMessage());
-            }
-        });
+    /** Start Day: local ticket_days row id. */
+    public static void createDay(Context ctx, long localDayId) {
+        try {
+            queue(ctx, ApiEndpoints.CREATE_DAY, SyncPayloads.queued(SyncPayloads.LOCAL_DAY_ID, localDayId));
+        } catch (Exception e) {
+            AppLog.e(TAG, "createDay queue failed", e);
+        }
     }
 
-    /** End Day */
+    /** End Day + waybill. Amounts and end time are fixed now, the server day id is added at send time. */
     public static void endDay(Context ctx,
-                              int dayId,
+                              long localDayId,
                               String prefsDate_ddMMyy,
                               String busNo,
                               int totalReceipt,
@@ -168,144 +69,51 @@ public final class SyncClient {
                               float wages,
                               float wellMeal,
                               float maintenance,
-                              float otherExpenses,
-                              Callback cb) {
-
-        EXEC.execute(() -> {
-            try {
-                int userId    = safeInt(PrefsSecure.getTenantId(ctx));
-                int machineId = safeInt(PrefsSecure.getMachineId(ctx));
-
-                String date     = DateFmt.prefsToServerDate(prefsDate_ddMMyy);
-                String end_time = DateFmt.nowServerDateTime();
-
-                JSONObject payload = new JSONObject()
-                        .put("day_id", dayId)
-                        .put("user_id", userId)
-                        .put("machine_id", machineId)
-                        .put("date", date)
-                        .put("bus_no", busNo)
-                        .put("end_time", end_time)
-                        .put("total_receipt", totalReceipt)
-                        .put("other_receipt", otherReceipt)
-                        .put("diesel", diesel)
-                        .put("wages", wages)
-                        .put("well_meal", wellMeal)
-                        .put("maintenance", maintenance)
-                        .put("other_expenses", otherExpenses);
-
-                try {
-                    String respStr = HttpUtil.postJson(ApiEndpoints.END_DAY, payload.toString());
-                    JSONObject resp = new JSONObject(respStr);
-                    if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        deliverSuccess(cb, resp);
-                    } else {
-                        LogSink.logTerminalFailure(ctx, ApiEndpoints.END_DAY, payload.toString(),
-                                resp.optString("message", "server fail"));
-                        deliverFail(cb, resp.optString("message", "server fail"));
-                    }
-                } catch (Exception netOrParse) {
-                    SyncQueueUtil.enqueue(ctx, ApiEndpoints.END_DAY, payload, netOrParse.getMessage());
-                    deliverFail(cb, netOrParse.getMessage());
-                }
-            } catch (Exception e) {
-                deliverFail(cb, e.getMessage());
-            }
-        });
+                              float otherExpenses) {
+        try {
+            JSONObject payload = SyncPayloads.queued(SyncPayloads.LOCAL_DAY_ID, localDayId)
+                    .put("date", DateFmt.prefsToServerDate(prefsDate_ddMMyy))
+                    .put("bus_no", busNo)
+                    .put("end_time", DateFmt.nowServerDateTime())
+                    .put("total_receipt", totalReceipt)
+                    .put("other_receipt", otherReceipt)
+                    .put("diesel", diesel)
+                    .put("wages", wages)
+                    .put("well_meal", wellMeal)
+                    .put("maintenance", maintenance)
+                    .put("other_expenses", otherExpenses);
+            queue(ctx, ApiEndpoints.END_DAY, payload);
+        } catch (Exception e) {
+            AppLog.e(TAG, "endDay queue failed", e);
+        }
     }
 
-    /** Start Trip */
-    public static void startTrip(Context ctx,
-                                 int dayId,
-                                 int tripNo,
-                                 String routeName,
-                                 String routeDirection,
-                                 Callback cb) {
-        EXEC.execute(() -> {
-            try {
-                int userId    = safeInt(PrefsSecure.getTenantId(ctx));
-                int machineId = safeInt(PrefsSecure.getMachineId(ctx));
-                String startTime = DateFmt.nowServerTime(); // "HH:mm:ss"
-
-                JSONObject payload = new JSONObject()
-                        .put("user_id", userId)
-                        .put("day_id", dayId)
-                        .put("machine_id", machineId)
-                        .put("trip_no", tripNo)
-                        .put("route_name", routeName)
-                        .put("route_direction", routeDirection)
-                        .put("start_time", startTime);
-
-                try {
-                    String respStr = HttpUtil.postJson(ApiEndpoints.START_TRIP, payload.toString());
-                    JSONObject resp = new JSONObject(respStr);
-                    if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        int tripId = resp.optInt("trip_id", 0);
-                        if (tripId > 0) {
-                            Prefs.saveCurrentServerTripID(ctx, tripId);
-                        }
-                        deliverSuccess(cb, resp);
-                    } else {
-                        // server responded fail → enqueue
-                        LogSink.logTerminalFailure(ctx, ApiEndpoints.CREATE_DAY, payload.toString(),
-                                resp.optString("message", "server fail"));
-                        deliverFail(cb, resp.optString("message", "server fail"));
-                    }
-                } catch (Exception netOrParse) {
-                    // no feedback / non-200 → enqueue
-                    SyncQueueUtil.enqueue(ctx, ApiEndpoints.START_TRIP, payload, netOrParse.getMessage());
-                    deliverFail(cb, netOrParse.getMessage());
-                }
-
-            } catch (Exception e) {
-                deliverFail(cb, e.getMessage());
-            }
-        });
+    /** Start Trip: local trips row id (route, direction, start time are read from the row at send time). */
+    public static void startTrip(Context ctx, long localTripId) {
+        try {
+            queue(ctx, ApiEndpoints.START_TRIP, SyncPayloads.queued(SyncPayloads.LOCAL_TRIP_ID, localTripId));
+        } catch (Exception e) {
+            AppLog.e(TAG, "startTrip queue failed", e);
+        }
     }
 
-    /** End Trip */
-    public static void endTrip(Context ctx,
-                               int tripId,
-                               int dayId,
-                               int tripNo,
-                               Callback cb) {
-        EXEC.execute(() -> {
-            try {
-                int userId    = safeInt(PrefsSecure.getTenantId(ctx));
-                int machineId = safeInt(PrefsSecure.getMachineId(ctx));
-                String endTime = DateFmt.nowServerTime(); // "HH:mm:ss"
-
-                JSONObject payload = new JSONObject()
-                        .put("user_id", userId)
-                        .put("trip_id", tripId)
-                        .put("day_id", dayId)
-                        .put("machine_id", machineId)
-                        .put("trip_no", tripNo)
-                        .put("end_time", endTime);
-
-                try {
-                    String respStr = HttpUtil.postJson(ApiEndpoints.END_TRIP, payload.toString());
-                    JSONObject resp = new JSONObject(respStr);
-                    if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        deliverSuccess(cb, resp);
-                    } else {
-                        LogSink.logTerminalFailure(ctx, ApiEndpoints.END_TRIP, payload.toString(),
-                                resp.optString("message", "server fail"));
-                        deliverFail(cb, resp.optString("message", "server fail"));
-                    }
-                } catch (Exception netOrParse) {
-                    SyncQueueUtil.enqueue(ctx, ApiEndpoints.END_TRIP, payload, netOrParse.getMessage());
-                    deliverFail(cb, netOrParse.getMessage());
-                }
-            } catch (Exception e) {
-                deliverFail(cb, e.getMessage());
-            }
-        });
+    /** End Trip. */
+    public static void endTrip(Context ctx, long localTripId, int tripNo, String endTimeHms) {
+        try {
+            JSONObject payload = SyncPayloads.queued(SyncPayloads.LOCAL_TRIP_ID, localTripId)
+                    .put("trip_no", tripNo)
+                    .put("end_time", endTimeHms);
+            queue(ctx, ApiEndpoints.END_TRIP, payload);
+        } catch (Exception e) {
+            AppLog.e(TAG, "endTrip queue failed", e);
+        }
     }
 
-    /** Record Ticket */
+    /** Record Ticket: local trip id + local ticket id; ticket fields fixed now. */
     public static void recordTicket(
             Context ctx,
+            long localTripId,
+            long localTicketId,
             String ticketNo,
             String dateYmd,           // "yyyy-MM-dd"
             String timeHms,           // "HH:mm:ss"
@@ -313,107 +121,40 @@ public final class SyncClient {
             String ticketType,        // "TO" or "UP TO"
             String endStage,
             String fareType,          // "Adult" | "Student" | "Child"
-            int amount,               // send as int
-            Callback cb
+            int amount
     ) {
-        EXEC.execute(() -> {
-            try {
-                int userId    = safeInt(PrefsSecure.getTenantId(ctx));
-                int machineId = safeInt(PrefsSecure.getMachineId(ctx));
-                int tripId    = Prefs.getCurrentServerTripID(ctx); // server trip id saved on startTrip success
-
-                // Build payload
-                JSONObject payload = new JSONObject()
-                        .put("user_id", userId)
-                        .put("machine_id", machineId)
-                        .put("trip_id", tripId)
-                        .put("ticket_no", ticketNo)
-                        .put("date", dateYmd)
-                        .put("time", timeHms)
-                        .put("start_stage", startStage)
-                        .put("ticket_type", ticketType)
-                        .put("end_stage", endStage)
-                        .put("fare_type", fareType)
-                        .put("amount", amount);
-
-                try {
-                    String respStr = HttpUtil.postJson(ApiEndpoints.RECORD_TICKET, payload.toString());
-                    JSONObject resp = new JSONObject(respStr);
-
-                    if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        deliverSuccess(cb, resp);
-                    } else {
-                        // HTTP 200 but server says fail → log terminal, do NOT retry
-                        LogSink.logTerminalFailure(
-                                ctx,
-                                ApiEndpoints.RECORD_TICKET,
-                                payload.toString(),
-                                resp.optString("message", "server fail")
-                        );
-                        deliverFail(cb, resp.optString("message", "server fail"));
-                    }
-                } catch (Exception netOrParse) {
-                    // Network/HTTP/parsing error → enqueue for retry
-                    SyncQueueUtil.enqueue(
-                            ctx,
-                            ApiEndpoints.RECORD_TICKET,
-                            payload,
-                            netOrParse.getMessage()
-                    );
-                    deliverFail(cb, netOrParse.getMessage());
-                }
-
-            } catch (Exception e) {
-                deliverFail(cb, e.getMessage());
-            }
-        });
+        try {
+            JSONObject payload = SyncPayloads.queued(SyncPayloads.LOCAL_TRIP_ID, localTripId)
+                    .put(SyncPayloads.LOCAL_TICKET_ID, localTicketId)
+                    .put("ticket_no", ticketNo)
+                    .put("date", dateYmd)
+                    .put("time", timeHms)
+                    .put("start_stage", startStage)
+                    .put("ticket_type", ticketType)
+                    .put("end_stage", endStage)
+                    .put("fare_type", fareType)
+                    .put("amount", amount);
+            queue(ctx, ApiEndpoints.RECORD_TICKET, payload);
+        } catch (Exception e) {
+            AppLog.e(TAG, "recordTicket queue failed", e);
+        }
     }
 
-    /** Push Blank Ticket (e.g. on printer paper-out) */
-    public static void recordBlankTicket(Context ctx,
-                                         String datetimeYmdHms,   // "yyyy-MM-dd HH:mm:ss"
-                                         Callback cb) {
-        EXEC.execute(() -> {
-            try {
-                int userId    = safeInt(PrefsSecure.getTenantId(ctx));
-                int machineId = safeInt(PrefsSecure.getMachineId(ctx));
-                int tripId    = Prefs.getCurrentServerTripID(ctx);
-
-                // 🧱 Build JSON payload
-                JSONObject payload = new JSONObject()
-                        .put("user_id", userId)
-                        .put("machine_id", machineId)
-                        .put("trip_id", tripId)
-                        .put("datetime", datetimeYmdHms);
-
-                try {
-                    // 🌐 Direct attempt
-                    String respStr = HttpUtil.postJson(ApiEndpoints.BLANK_TICKET, payload.toString());
-                    JSONObject resp = new JSONObject(respStr);
-
-                    if ("success".equalsIgnoreCase(resp.optString("status"))) {
-                        deliverSuccess(cb, resp);
-                    } else {
-                        // Server replied with fail → log & no retry
-                        LogSink.logTerminalFailure(
-                                ctx,
-                                ApiEndpoints.BLANK_TICKET,
-                                payload.toString(),
-                                resp.optString("message", "server fail")
-                        );
-                        deliverFail(cb, resp.optString("message", "server fail"));
-                    }
-
-                } catch (Exception netOrParse) {
-                    // 🌐 Network or JSON parse error → enqueue for later retry
-                    SyncQueueUtil.enqueue(ctx, ApiEndpoints.BLANK_TICKET, payload, netOrParse.getMessage());
-                    deliverFail(cb, netOrParse.getMessage());
-                }
-
-            } catch (Exception e) {
-                deliverFail(cb, e.getMessage());
-            }
-        });
+    /** Blank ticket (printer paper-out). Needs a trip; without one it stays on the device only. */
+    public static void recordBlankTicket(Context ctx, long localTripId, long localBlankId,
+                                         String datetimeYmdHms) {
+        if (localTripId <= 0) {
+            AppLog.w(TAG, "Blank ticket #" + localBlankId + " has no trip; kept on device only");
+            return;
+        }
+        try {
+            JSONObject payload = SyncPayloads.queued(SyncPayloads.LOCAL_TRIP_ID, localTripId)
+                    .put(SyncPayloads.LOCAL_BLANK_ID, localBlankId)
+                    .put("datetime", datetimeYmdHms);
+            queue(ctx, ApiEndpoints.BLANK_TICKET, payload);
+        } catch (Exception e) {
+            AppLog.e(TAG, "recordBlankTicket queue failed", e);
+        }
     }
 
     /**

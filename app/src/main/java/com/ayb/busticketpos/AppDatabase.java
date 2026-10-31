@@ -4,6 +4,7 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.room.*;
+import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
 import java.util.*;
@@ -22,10 +23,21 @@ import java.util.*;
                 BlankTicketEntity.class,
                 ReportsEntity.class
         },
-        version = 22,
+        version = 23,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
+
+    /** 2.2.0: server ids / uploaded flags for offline-first ordered sync. Keeps all local data. */
+    static final Migration MIGRATION_22_23 = new Migration(22, 23) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE ticket_days ADD COLUMN serverId INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE trips ADD COLUMN serverId INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE tickets ADD COLUMN uploaded INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE blank_tickets ADD COLUMN uploaded INTEGER NOT NULL DEFAULT 0");
+        }
+    };
 
     public abstract RouteDao routeDao();
     public abstract StageDao stageDao();
@@ -52,7 +64,12 @@ public abstract class AppDatabase extends RoomDatabase {
                                     AppDatabase.class,
                                     "busticketpos.db"
                             )
-                            .fallbackToDestructiveMigration()
+                            .addMigrations(MIGRATION_22_23)
+                            // Never wipe tickets on upgrade from 22+: every version bump needs a Migration.
+                            // Only very old schemas (< 22, no migrations written) are still recreated.
+                            .fallbackToDestructiveMigrationFrom(true,
+                                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
+                            .fallbackToDestructiveMigrationOnDowngrade(true)
                             .addCallback(new RoomDatabase.Callback() {
                                 @Override
                                 public void onOpen(@NonNull SupportSQLiteDatabase db) {

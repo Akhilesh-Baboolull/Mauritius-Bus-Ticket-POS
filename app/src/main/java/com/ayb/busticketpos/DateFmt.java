@@ -28,6 +28,20 @@ public final class DateFmt {
         return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
     }
 
+    /** "2025-08-23" -> "23/08/25" (local ticket_days.date format); null if unparseable. */
+    public static String serverToPrefsDate(String serverDate) {
+        try {
+            if (serverDate != null) {
+                Date d = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(serverDate);
+                if (d != null) {
+                    return new SimpleDateFormat("dd/MM/yy", Locale.US).format(d);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
     public static String nowServerDateTime() {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
     }
